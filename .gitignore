@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Generated demo HTML files (built by CI)
+docs/demos/*.html
+!docs/demos/index.md
+
+# MkDocs build output
+site/
+
+# Test artifacts
+test_export*.html
+test_*.html
+standalone_*.html
+
+# OS
+.DS_Store
+Thumbs.db

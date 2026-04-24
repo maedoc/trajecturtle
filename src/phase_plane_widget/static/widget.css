@@ -1,0 +1,244 @@
+.ppw-widget {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    padding: 10px;
+    color: #333;
+    background: #fff;
+}
+
+.ppw-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.ppw-control-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ppw-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #495057;
+}
+
+.ppw-model-select {
+    padding: 4px 8px;
+    font-size: 13px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: #fff;
+    min-width: 160px;
+}
+
+.ppw-params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    flex: 1;
+    min-width: 200px;
+}
+
+.ppw-param {
+    display: flex;
+    flex-direction: column;
+    min-width: 130px;
+    flex: 1;
+}
+
+.ppw-param label {
+    font-size: 11px;
+    color: #6c757d;
+    margin-bottom: 2px;
+    cursor: help;
+}
+
+.ppw-param-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: #212529;
+    min-width: 50px;
+}
+
+.ppw-param-slider {
+    width: 100%;
+    margin: 0;
+    cursor: pointer;
+}
+
+.ppw-limits {
+    gap: 6px;
+}
+
+.ppw-limits input[type="number"] {
+    width: 60px;
+    padding: 3px 6px;
+    font-size: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+}
+
+.ppw-toggles {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.ppw-toggles label {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ppw-plots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.ppw-phase-container,
+.ppw-time-container {
+    flex: 1;
+    min-width: 300px;
+}
+
+.ppw-canvas-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ppw-canvas-hint {
+    font-size: 11px;
+    color: #adb5bd;
+    margin-top: 4px;
+}
+
+.ppw-phase-canvas,
+.ppw-time-canvas,
+.ppw-sweep-canvas {
+    width: 100%;
+    height: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: #fafafa;
+    cursor: crosshair;
+    display: block;
+}
+
+.ppw-sweep {
+    margin-top: 16px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.ppw-sweep-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+}
+
+.ppw-sweep-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.ppw-sweep-controls label {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ppw-sweep-controls input[type="number"] {
+    width: 60px;
+    padding: 3px 6px;
+    font-size: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+}
+
+.ppw-sweep-btn {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: #2196F3;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.ppw-sweep-btn:hover {
+    background: #1976D2;
+}
+
+.ppw-sweep-btn:disabled {
+    background: #90caf9;
+    cursor: not-allowed;
+}
+
+.ppw-sweep-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #2196F3;
+    border-radius: 50%;
+    animation: ppw-spin 0.6s linear infinite;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+@keyframes ppw-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.ppw-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 6px;
+    font-size: 11px;
+}
+
+.ppw-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ppw-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid #333;
+}
+
+.ppw-legend-line {
+    width: 20px;
+    height: 3px;
+    border-radius: 1px;
+}
