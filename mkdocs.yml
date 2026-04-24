@@ -2,8 +2,8 @@ site_name: Phase Plane Widget
 site_description: Interactive phase plane widget for neural mass models
 site_author: Duke
 
-repo_name: phase-plane-widget
-# repo_url: https://github.com/YOUR_USERNAME/phase-plane-widget
+repo_name: trajecturtle
+# repo_url: https://github.com/maedoc/trajecturtle
 # edit_uri: edit/main/docs/
 
 theme:

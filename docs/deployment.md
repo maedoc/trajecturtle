@@ -119,7 +119,7 @@ embed_minimal_html("export.html", views=[widget], title="Phase Plane",
 
 ## CI/CD: Auto-Generated Documentation
 
-This site is built automatically by a [GitHub Actions workflow](https://github.com/YOUR_USERNAME/phase-plane-widget/blob/main/.github/workflows/docs.yml) that:
+This site is built automatically by a [GitHub Actions workflow](https://github.com/maedoc/trajecturtle/blob/main/.github/workflows/docs.yml) that:
 
 1. Installs the package
 2. Generates standalone HTML demos for each model

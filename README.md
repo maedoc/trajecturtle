@@ -2,7 +2,7 @@
 
 Interactive phase plane widget for neural mass models, usable in Jupyter notebooks, VS Code, and static HTML exports.
 
-📖 **[Full Documentation & Live Demos](https://YOUR_USERNAME.github.io/phase-plane-widget/)**
+📖 **[Full Documentation & Live Demos](https://maedoc.github.io/trajecturtle/)**
 
 ## Features
 
@@ -74,9 +74,9 @@ embed_minimal_html("export.html", views=[widget], title="Phase Plane Widget")
 
 ## Documentation
 
-See the [full documentation site](https://YOUR_USERNAME.github.io/phase-plane-widget/) for:
+See the [full documentation site](https://maedoc.github.io/trajecturtle/) for:
 
 - **Live interactive demos** (embedded standalone widgets)
-- [Deployment guide](https://YOUR_USERNAME.github.io/phase-plane-widget/deployment/) — Jupyter, VS Code, standalone HTML, mkdocs
-- [Model reference](https://YOUR_USERNAME.github.io/phase-plane-widget/models/) — equations, parameters, dynamics
-- [API reference](https://YOUR_USERNAME.github.io/phase-plane-widget/api/) — auto-generated from docstrings
+- [Deployment guide](https://maedoc.github.io/trajecturtle/deployment/) — Jupyter, VS Code, standalone HTML, mkdocs
+- [Model reference](https://maedoc.github.io/trajecturtle/models/) — equations, parameters, dynamics
+- [API reference](https://maedoc.github.io/trajecturtle/api/) — auto-generated from docstrings

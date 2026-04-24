@@ -32,14 +32,11 @@ jobs:
       - name: Install Python
         run: uv python install 3.12
 
-      - name: Install package + docs dependencies
-        run: uv pip install -e ".[docs]"
-
       - name: Generate demo widgets
-        run: python scripts/generate_demos.py
+        run: uv run --extra docs python scripts/generate_demos.py
 
       - name: Build mkdocs
-        run: mkdocs build --strict
+        run: uv run --extra docs mkdocs build --strict
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
