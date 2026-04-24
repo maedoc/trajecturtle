@@ -18,6 +18,58 @@ class BaseModel:
     default_xlim = [-1.0, 1.0]
     default_ylim = [-1.0, 1.0]
 
+    @property
+    def state_vars(self):
+        """Ordered list of all state variable names (alias for ``state_names``)."""
+        return list(self.state_names)
+
+    def to_model_spec(self):
+        """Return a dict compatible with :class:`ModelSpec` and the JS widget.
+
+        Built-in models use this to populate the ``model_spec`` traitlet when
+        the user switches to a custom-model view.
+        """
+        from .model_spec import ModelSpec
+
+        # Build state_vars dict: name -> (default, (min, max))
+        sv = {}
+        for i, name in enumerate(self.state_names):
+            # Use default xlim/ylim for ranges
+            if i == 0:
+                lo, hi = self.default_xlim
+            elif i == 1:
+                lo, hi = self.default_ylim
+            else:
+                lo, hi = -5.0, 5.0
+            sv[name] = (0.0, (lo, hi))
+
+        # Build parameters dict: name -> (default, (min, max), step)
+        params = {}
+        for name, spec in self.param_info.items():
+            lo, hi, default, _desc = spec
+            step = (hi - lo) / 500.0
+            params[name] = (default, (lo, hi), step)
+
+        # Equations as strings — for built-in models the JS already has the
+        # compiled functions, so we return empty equations and rely on the
+        # ``model_name`` traitlet to select the hard-coded JS model.
+        return {
+            "name": self.name,
+            "state_vars": {
+                n: {"default": d, "range": [lo, hi]}
+                for n, (d, (lo, hi)) in sv.items()
+            },
+            "parameters": {
+                n: {"default": d, "range": [lo, hi], "step": step}
+                for n, (d, (lo, hi), step) in params.items()
+            },
+            "equations": {},
+            "display": list(range(min(2, len(self.state_names)))),
+            "custom_functions": {},
+            "integrator": "rk4",
+            "noise_per_var": None,
+        }
+
     def f(self, t, state, params):
         """Compute derivatives. Returns list of length dim."""
         raise NotImplementedError

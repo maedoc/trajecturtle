@@ -61,6 +61,9 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     show_trajectory = traitlets.Bool(True).tag(sync=True)
     show_fixed_points = traitlets.Bool(True).tag(sync=True)
 
+    # Custom model specification (JSON-serialisable dict for JS)
+    model_spec = traitlets.Dict(allow_none=True, default_value=None).tag(sync=True)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._update_model()
@@ -83,6 +86,43 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     @traitlets.observe("model_name")
     def _on_model_change(self, change):
         self._update_model()
+
+    def set_model_spec(self, spec: dict):
+        """Load a custom model from a ``ModelSpec`` dict.
+
+        Parameters
+        ----------
+        spec : dict
+            JSON-serialisable model specification (see
+            :meth:`ModelSpec.to_widget_state`).
+        """
+        self.model_spec = spec
+        self.model_name = "custom"
+        # Derive initial params / limits from the spec so the widget
+        # has sensible defaults before JS takes over.
+        params = {n: v["default"] for n, v in spec.get("parameters", {}).items()}
+        self.params = params
+        # Sync param_info for the existing slider infrastructure
+        param_info = {}
+        for n, v in spec.get("parameters", {}).items():
+            lo, hi = v["range"]
+            step = v.get("step", (hi - lo) / 500)
+            param_info[n] = [lo, hi, v["default"], f"Parameter {n}"]
+        self.param_info = param_info
+        state_names = list(spec.get("state_vars", {}).keys())
+        self.state_names = state_names
+        # Set default display limits from state variable ranges
+        state_vars = spec.get("state_vars", {})
+        if state_names:
+            first = state_names[0]
+            lo, hi = state_vars[first]["range"]
+            self.xlim = [lo, hi]
+            self.x0 = state_vars[first]["default"]
+        if len(state_names) > 1:
+            second = state_names[1]
+            lo, hi = state_vars[second]["range"]
+            self.ylim = [lo, hi]
+            self.y0 = state_vars[second]["default"]
 
     # ── Python-side helpers (for programmatic use / validation) ──
 
@@ -148,6 +188,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "sweep_fixed_points": self.sweep_fixed_points,
             "sweep_param": "",
             "sweep_running": False,
+            "model_spec": self.model_spec,
         }
 
         html = f"""<!DOCTYPE html>
