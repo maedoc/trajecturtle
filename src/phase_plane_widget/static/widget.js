@@ -14,14 +14,17 @@ const REGIME_COLORS = {
 
 const STATE_COLORS = ["#2196F3", "#f44336", "#4CAF50", "#FF9800"];
 
+/** Safe exponential that prevents overflow. */
+function expClamp(x) {
+  return Math.exp(Math.max(-709, Math.min(709, x)));
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  MODEL DEFINITIONS  (all computation runs client-side)
 // ═══════════════════════════════════════════════════════════════
 
 function _sigmoid(x, k, theta) {
-  const arg = -k * (x - theta);
-  const clipped = Math.max(-709, Math.min(709, arg));
-  return 1.0 / (1.0 + Math.exp(clipped));
+  return 1.0 / (1.0 + expClamp(-k * (x - theta)));
 }
 
 const MODELS = {
@@ -141,9 +144,9 @@ function makeProjectedRHS(modelName, displayIdx, clamped) {
   };
 }
 
-/** Fixed-step RK4 ODE solver.
+/** Core fixed-step RK4 ODE solver (bare computation, no safety wrappers).
  *  Returns array of [t, v0, v1, ...] rows.  */
-function rk4(modelName, y0, t0, tf, h, params) {
+function _rk4Core(modelName, y0, t0, tf, h, params) {
   const f = MODELS[modelName].f;
   const results = [[t0, ...y0]];
   let t = t0;
@@ -159,6 +162,35 @@ function rk4(modelName, y0, t0, tf, h, params) {
     // Check for NaN / blow-up and abort gracefully
     if (y.some((v) => !isFinite(v))) break;
     results.push([t, ...y]);
+  }
+  return results;
+}
+
+/** Safe RK4 wrapper with NaN/Inf detection, step budget, and exp clamping.
+ *  Returns array of [t, v0, v1, ...] rows, truncated on NaN/Inf/budget. */
+function rk4(modelName, y0, t0, tf, h, params) {
+  const MAX_STEPS = 50000;
+  const f = MODELS[modelName].f;
+  const results = [[t0, ...y0]];
+  let t = t0;
+  let y = [...y0];
+  let steps = 0;
+  while (t < tf - 1e-12) {
+    if (steps >= MAX_STEPS) break;
+    const dt = Math.min(h, tf - t);
+    const k1 = f(t, y, params);
+    if (k1.some(v => !isFinite(v))) break;
+    const k2 = f(t + dt / 2, y.map((yi, i) => yi + (dt / 2) * k1[i]), params);
+    if (k2.some(v => !isFinite(v))) break;
+    const k3 = f(t + dt / 2, y.map((yi, i) => yi + (dt / 2) * k2[i]), params);
+    if (k3.some(v => !isFinite(v))) break;
+    const k4 = f(t + dt, y.map((yi, i) => yi + dt * k3[i]), params);
+    if (k4.some(v => !isFinite(v))) break;
+    y = y.map((yi, i) => yi + (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+    t += dt;
+    if (y.some((v) => !isFinite(v))) break;
+    results.push([t, ...y]);
+    steps++;
   }
   return results;
 }
@@ -208,50 +240,97 @@ function classifyFixedPoint(eigenvalues) {
   return "saddle";
 }
 
-/** Grid-search + Newton-Raphson fixed-point finder (2D). */
+/** Grid-search + Newton-Raphson fixed-point finder (1D/2D). */
 function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
+  const MAX_ITER_TOTAL = 625;
+  let iterCount = 0;
   const tol = 0.08;
   const fixedPoints = [];
-  const xs = linspace(xlim[0], xlim[1], nGrid);
-  const ys = linspace(ylim[0], ylim[1], nGrid);
+  const test = f(0, [(xlim[0] + xlim[1]) / 2], params);
+  const is1D = test.length === 1;
 
-  for (const xi of xs) {
-    for (const yi of ys) {
-      let x = [xi, yi];
+  if (is1D) {
+    const xs = linspace(xlim[0], xlim[1], nGrid);
+    for (const xi of xs) {
+      let x = xi;
       for (let iter = 0; iter < 50; iter++) {
-        const fx = f(0, x, params);
-        const norm = Math.sqrt(fx[0] ** 2 + fx[1] ** 2);
-        if (norm < 1e-6) {
-          // Converged — classify and store
-          if (
-            xlim[0] - 0.5 <= x[0] &&
-            x[0] <= xlim[1] + 0.5 &&
-            ylim[0] - 0.5 <= x[1] &&
-            x[1] <= ylim[1] + 0.5 &&
-            norm <= 0.1
-          ) {
+        if (iterCount >= MAX_ITER_TOTAL) {
+          console.warn('Budget exhausted: findFixedPoints');
+          return [];
+        }
+        iterCount++;
+        const fx = f(0, [x], params)[0];
+        if (Math.abs(fx) < 1e-6) {
+          if (xlim[0] - 0.5 <= x && x <= xlim[1] + 0.5) {
             let isNew = true;
             for (const ex of fixedPoints) {
-              const dist = Math.sqrt((x[0] - ex[0]) ** 2 + (x[1] - ex[1]) ** 2);
-              if (dist < tol) {
+              if (Math.abs(x - ex[0]) < tol) {
                 isNew = false;
                 break;
               }
             }
             if (isNew) {
-              const J = jacobianND(f, x, params);
-              const ev = eigenvalues2x2(J);
-              fixedPoints.push([x[0], x[1], classifyFixedPoint(ev)]);
+              const J1D = jacobianND(f, [x], params);
+              const deriv = J1D[0][0];
+              const stability = deriv < -1e-6 ? 'stable_node' : deriv > 1e-6 ? 'unstable_node' : 'saddle';
+              fixedPoints.push([x, 0, stability]);
             }
           }
           break;
         }
-        const J = jacobianND(f, x, params, 1e-6);
-        const det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
-        if (Math.abs(det) < 1e-12) break;
-        const dx0 = (-fx[0] * J[1][1] + fx[1] * J[0][1]) / det;
-        const dx1 = (fx[0] * J[1][0] - fx[1] * J[0][0]) / det;
-        x = [x[0] + dx0, x[1] + dx1];
+        const J1D = jacobianND(f, [x], params, 1e-6);
+        const deriv = J1D[0][0];
+        if (Math.abs(deriv) < 1e-12) break;
+        x = x - fx / deriv;
+      }
+    }
+  } else {
+    const xs = linspace(xlim[0], xlim[1], nGrid);
+    const ys = linspace(ylim[0], ylim[1], nGrid);
+
+    for (const xi of xs) {
+      for (const yi of ys) {
+        let x = [xi, yi];
+        for (let iter = 0; iter < 50; iter++) {
+          if (iterCount >= MAX_ITER_TOTAL) {
+            console.warn('Budget exhausted: findFixedPoints');
+            return [];
+          }
+          iterCount++;
+          const fx = f(0, x, params);
+          const norm = Math.sqrt(fx[0] ** 2 + fx[1] ** 2);
+          if (norm < 1e-6) {
+            // Converged — classify and store
+            if (
+              xlim[0] - 0.5 <= x[0] &&
+              x[0] <= xlim[1] + 0.5 &&
+              ylim[0] - 0.5 <= x[1] &&
+              x[1] <= ylim[1] + 0.5 &&
+              norm <= 0.1
+            ) {
+              let isNew = true;
+              for (const ex of fixedPoints) {
+                const dist = Math.sqrt((x[0] - ex[0]) ** 2 + (x[1] - ex[1]) ** 2);
+                if (dist < tol) {
+                  isNew = false;
+                  break;
+                }
+              }
+              if (isNew) {
+                const J = jacobianND(f, x, params);
+                const ev = eigenvalues2x2(J);
+                fixedPoints.push([x[0], x[1], classifyFixedPoint(ev)]);
+              }
+            }
+            break;
+          }
+          const J = jacobianND(f, x, params, 1e-6);
+          const det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
+          if (Math.abs(det) < 1e-12) break;
+          const dx0 = (-fx[0] * J[1][1] + fx[1] * J[0][1]) / det;
+          const dx1 = (fx[0] * J[1][0] - fx[1] * J[0][0]) / det;
+          x = [x[0] + dx0, x[1] + dx1];
+        }
       }
     }
   }
@@ -259,16 +338,50 @@ function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
 }
 
 /** Nullcline computation via grid zero-crossings. */
-function computeNullclines(f, xlim, ylim, nGrid = 60) {
+function computeNullclines(f, params, xlim, ylim, nGrid = 60) {
+  const MAX_EVAL = 3600;
+  let evalCount = 0;
   // f is a projected RHS function
-  const x = linspace(xlim[0], xlim[1], nGrid);
-  const y = linspace(ylim[0], ylim[1], nGrid);
+  const xs = linspace(xlim[0], xlim[1], nGrid);
+  // Detect 1-D: check dimension of the RHS
+  const test = f(0, [(xlim[0] + xlim[1]) / 2], params);
+  const is1D = test.length === 1;
+
+  if (is1D) {
+    // 1-D case: single nullcline f(x)=0
+    const zeroX = [];
+    for (let i = 0; i < xs.length; i++) {
+      if (evalCount >= MAX_EVAL) {
+        console.warn('Budget exhausted: computeNullclines');
+        return [[], []];
+      }
+      evalCount++;
+      const d = f(0, [xs[i]], params);
+      if (i > 0) {
+        const dPrev = f(0, [xs[i - 1]], params);
+        if (d[0] === 0) zeroX.push([xs[i], 0]);
+        else if (dPrev[0] * d[0] < 0) {
+          const t = Math.abs(dPrev[0]) / (Math.abs(dPrev[0]) + Math.abs(d[0]));
+          zeroX.push([xs[i - 1] + t * (xs[i] - xs[i - 1]), 0]);
+        }
+      }
+    }
+    return [zeroX, []];
+  }
+
+  // 2-D case
+  const ys = linspace(ylim[0], ylim[1], nGrid);
   const dx = Array(nGrid).fill(0).map(() => Array(nGrid).fill(0));
   const dy = Array(nGrid).fill(0).map(() => Array(nGrid).fill(0));
 
   for (let i = 0; i < nGrid; i++) {
     for (let j = 0; j < nGrid; j++) {
-      const d = f(0, [x[j], y[i]], params);
+      if (evalCount >= MAX_EVAL) {
+        console.warn('Budget exhausted: computeNullclines');
+        return [[], []];
+      }
+      evalCount++;
+      const d = f(0, [xs[j], ys[i]], params);
       dx[i][j] = d[0];
       dy[i][j] = d[1];
     }
@@ -279,19 +392,19 @@ function computeNullclines(f, xlim, ylim, nGrid = 60) {
     const n = Z.length;
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n - 1; j++) {
-        if (Z[i][j] === 0) points.push([x[j], y[i]]);
+        if (Z[i][j] === 0) points.push([xs[j], ys[i]]);
         else if (Z[i][j] * Z[i][j + 1] < 0) {
           const t = Math.abs(Z[i][j]) / (Math.abs(Z[i][j]) + Math.abs(Z[i][j + 1]));
-          points.push([x[j] + t * (x[j + 1] - x[j]), y[i]]);
+          points.push([xs[j] + t * (xs[j + 1] - xs[j]), ys[i]]);
         }
       }
     }
     for (let i = 0; i < n - 1; i++) {
       for (let j = 0; j < n; j++) {
-        if (Z[i][j] === 0) points.push([x[j], y[i]]);
+        if (Z[i][j] === 0) points.push([xs[j], ys[i]]);
         else if (Z[i][j] * Z[i + 1][j] < 0) {
           const t = Math.abs(Z[i][j]) / (Math.abs(Z[i][j]) + Math.abs(Z[i + 1][j]));
-          points.push([x[j], y[i] + t * (y[i + 1] - y[i])]);
+          points.push([xs[j], ys[i] + t * (ys[i + 1] - ys[i])]);
         }
       }
     }
@@ -301,16 +414,37 @@ function computeNullclines(f, xlim, ylim, nGrid = 60) {
   return [_findZeroCrossings(dx), _findZeroCrossings(dy)];
 }
 
-/** Sparse vector field. */
-function computeVectorField(f, xlim, ylim, nGrid = 12) {
-  // f is a projected RHS function
+/** Sparse vector field (1D/2D). */
+function computeVectorField(f, params, xlim, ylim, nGrid = 12) {
+  const MAX_VECTORS = 144;
   const xs = linspace(xlim[0], xlim[1], nGrid);
-  const ys = linspace(ylim[0], ylim[1], nGrid);
+  const test = f(0, [(xlim[0] + xlim[1]) / 2], params);
+  const is1D = test.length === 1;
   const vectors = [];
-  for (const xi of xs) {
-    for (const yi of ys) {
-      const d = f(0, [xi, yi], params);
-      vectors.push([xi, yi, d[0], d[1]]);
+  let count = 0;
+
+  if (is1D) {
+    for (const xi of xs) {
+      if (count >= MAX_VECTORS) {
+        console.warn('Budget exhausted: computeVectorField');
+        return [];
+      }
+      count++;
+      const d = f(0, [xi], params);
+      vectors.push([xi, 0, d[0], 0]);
+    }
+  } else {
+    const ys = linspace(ylim[0], ylim[1], nGrid);
+    for (const xi of xs) {
+      for (const yi of ys) {
+        if (count >= MAX_VECTORS) {
+          console.warn('Budget exhausted: computeVectorField');
+          return [];
+        }
+        count++;
+        const d = f(0, [xi, yi], params);
+        vectors.push([xi, yi, d[0], d[1]]);
+      }
     }
   }
   return vectors;
@@ -603,12 +737,12 @@ export function render({ model, el }) {
     const fProj = makeProjectedRHS(modelName, display, clamped);
 
     // Nullclines (projected 2-D slice)
-    const [ncX, ncY] = computeNullclines(fProj, xlim, ylim, 60);
+    const [ncX, ncY] = computeNullclines(fProj, params, xlim, ylim, 60);
     model.set("nullcline_x", ncX);
     model.set("nullcline_y", ncY);
 
     // Vector field (projected)
-    const vf = computeVectorField(fProj, xlim, ylim, 12);
+    const vf = computeVectorField(fProj, params, xlim, ylim, 12);
     model.set("vector_field", vf);
 
     // Fixed points (projected slice)
