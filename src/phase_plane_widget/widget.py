@@ -64,6 +64,12 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     # Custom model specification (JSON-serialisable dict for JS)
     model_spec = traitlets.Dict(allow_none=True, default_value=None).tag(sync=True)
 
+    # Display indices for multi-variable projections
+    display = traitlets.List([0, 1]).tag(sync=True)
+
+    # Clamped values for non-displayed state variables
+    clamped = traitlets.List(default_value=None, allow_none=True).tag(sync=True)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._update_model()
@@ -85,7 +91,8 @@ class PhasePlaneWidget(anywidget.AnyWidget):
 
     @traitlets.observe("model_name")
     def _on_model_change(self, change):
-        self._update_model()
+        if self.model_name != "custom":
+            self._update_model()
 
     def set_model_spec(self, spec: dict):
         """Load a custom model from a ``ModelSpec`` dict.
@@ -111,6 +118,9 @@ class PhasePlaneWidget(anywidget.AnyWidget):
         self.param_info = param_info
         state_names = list(spec.get("state_vars", {}).keys())
         self.state_names = state_names
+        # Sync display indices
+        display = spec.get("display", [0, min(1, len(state_names) - 1)])
+        self.display = display
         # Set default display limits from state variable ranges
         state_vars = spec.get("state_vars", {})
         if state_names:
@@ -119,10 +129,20 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             self.xlim = [lo, hi]
             self.x0 = state_vars[first]["default"]
         if len(state_names) > 1:
-            second = state_names[1]
+            second = state_names[display[1]] if len(display) > 1 else state_names[1]
             lo, hi = state_vars[second]["range"]
             self.ylim = [lo, hi]
             self.y0 = state_vars[second]["default"]
+        # Initialize clamped values for non-displayed vars
+        n = len(state_names)
+        clamped = []
+        for i, name in enumerate(state_names):
+            if i in display:
+                clamped.append(None)  # displayed vars are not clamped
+            else:
+                lo, hi = state_vars[name]["range"]
+                clamped.append((lo + hi) / 2.0)
+        self.clamped = clamped
 
     # ── Python-side helpers (for programmatic use / validation) ──
 
@@ -189,8 +209,8 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "sweep_param": "",
             "sweep_running": False,
             "model_spec": self.model_spec,
-            "display": [0, 1],
-            "clamped": None,
+            "display": list(self.display) if self.display else [0, 1],
+            "clamped": list(self.clamped) if self.clamped else None,
             "show_nullclines": self.show_nullclines,
             "show_vector_field": self.show_vector_field,
             "show_trajectory": self.show_trajectory,
