@@ -13393,6 +13393,7 @@ export function render({ model, el }) {
             <select class="ppw-model-select"></select>
           </label>
         </div>
+        <div class="ppw-params"></div>
         <div class="ppw-control-row ppw-state-selector" style="display:none">
           <label class="ppw-label">X axis:
             <select class="ppw-state-x"></select>
@@ -13861,6 +13862,7 @@ export function render({ model, el }) {
         sigma[idx] = val;
         model.set("noise_sigma", sigma);
         if (!isStandalone) model.save_changes();
+        computeAll();
       });
     });
   }

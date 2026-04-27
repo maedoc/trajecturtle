@@ -13,6 +13,7 @@ def test_standalone_html_has_editor_elements():
     assert 'ppw-editor-apply' in html
     assert 'ppw-editor-copy' in html
     assert 'ppw-ed-expr' in html
+    assert 'ppw-params' in html, "params container missing from DOM template"
 
 
 def test_custom_model_sets_editor_spec():
