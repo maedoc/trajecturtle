@@ -18,8 +18,23 @@ widget
 
 1. Python creates the widget and syncs initial state via `traitlets`
 2. `anywidget` loads the JS front-end in the notebook
-3. **All subsequent interaction** (sliders, clicks, sweeps) is handled by JavaScript — no Python kernel round-trips
-4. Python can still read back computed data (nullclines, fixed points, trajectories) via the synced traitlets
+3. **All subsequent interaction** (sliders, clicks, sweeps, noise toggles) is handled by JavaScript
+4. Python can still read back computed data (nullclines, fixed points, trajectories) via synced traitlets
+
+### Custom Models in Jupyter
+
+```python
+from phase_plane_widget import phase_plane
+
+pp = phase_plane(
+    equations=["a*x - x**3 - y", "x - b*y"],
+    state_vars={"x": (-3, 3), "y": (-3, 3)},
+    params={"a": (0.7, 0, 2), "b": (0.8, 0, 2)},
+)
+pp
+```
+
+The SymPy expressions are transpiled to JavaScript via an inlined Nerdamer CAS (~100 KB) that compiles and runs entirely in the browser.
 
 ### Exporting Notebooks
 
@@ -42,7 +57,7 @@ widget = PhasePlaneWidget()
 widget  # Renders in the VS Code output panel
 ```
 
-No extra configuration needed — the same `anywidget` bridge works transparently.
+No extra configuration needed.
 
 ---
 
@@ -51,20 +66,33 @@ No extra configuration needed — the same `anywidget` bridge works transparentl
 For blogs, documentation, course materials, or any static site where you cannot run a Python kernel:
 
 ```python
+from phase_plane_widget import PhasePlaneWidget
+
 widget = PhasePlaneWidget(model_name="mpr")
-widget.params["delta"] = 1.0
-widget.params["eta_bar"] = -5.0
-widget.params["J"] = 15.0
 widget.to_standalone_html("mpr_demo.html", title="MPR Phase Plane")
+```
+
+### Custom Models in Standalone HTML
+
+```python
+from phase_plane_widget import phase_plane
+
+pp = phase_plane(
+    equations=["a*x - y", "x - b*y"],
+    state_vars={"x": (-3, 3), "y": (-3, 3)},
+    params={"a": (1.0, 0, 2), "b": (1.0, 0, 2)},
+)
+pp.to_standalone_html("custom_model.html", title="Custom Model")
 ```
 
 ### What You Get
 
-A **single self-contained `.html` file** (~40–50 KB) containing:
+A **single self-contained `.html` file** (~700 KB) containing:
 
-- All three model definitions (Wilson-Cowan, FHN, MPR)
-- RK4 ODE solver
-- Newton-Raphson fixed-point finder
+- All built-in model definitions
+- Inlined Nerdamer CAS for custom model compilation
+- RK4 and stochastic Heun integrators
+- Newton-Raphson fixed-point finder with budget guards
 - Nullcline and vector field computation
 - HTML5 Canvas rendering engine
 - Parameter sweep engine
@@ -87,9 +115,7 @@ This entire documentation site uses this technique — every [demo](demos/index.
 
 ---
 
-## 4. ipywidgets `embed_minimal_html`
-
-For a traditional ipywidgets-based export (requires a web server with widget support):
+## 4. ipywidgets `embed_minimal_html` (Not Recommended)
 
 ```python
 from ipywidgets.embed import embed_minimal_html
@@ -102,7 +128,7 @@ embed_minimal_html("export.html", views=[widget], title="Phase Plane",
 
 !!! warning "Requires widget JS runtime"
 
-    `embed_minimal_html` produces a file that references the `anywidget` CDN bundle via RequireJS. This **does not work** when opened as a local file (`file://`) because RequireJS cannot load ES modules. Use `to_standalone_html()` instead for true offline/self-contained deployment.
+    `embed_minimal_html` produces a file that references the `anywidget` CDN bundle via RequireJS. This **does not work** when opened as a local file (`file://`). Use `to_standalone_html()` instead for true offline/self-contained deployment.
 
 ---
 
@@ -110,16 +136,16 @@ embed_minimal_html("export.html", views=[widget], title="Phase Plane",
 
 | Scenario | Python Kernel | Internet | File Size | Best For |
 |----------|--------------|----------|-----------|----------|
-| Jupyter Notebook | Required at runtime | Optional | ~40KB JS | Research, exploration |
-| VS Code | Required at runtime | Optional | ~40KB JS | IDE-based workflow |
-| **Standalone HTML** | **None** | **None** | **~45KB** | **Docs, blogs, courses** |
-| `embed_minimal_html` | Required to generate | Required to view | ~2KB + CDN | Sharing with Jupyter users |
+| Jupyter Notebook | Required at runtime | Optional | ~700 KB JS | Research, exploration |
+| VS Code | Required at runtime | Optional | ~700 KB JS | IDE-based workflow |
+| **Standalone HTML** | **None** | **None** | **~700 KB** | **Docs, blogs, courses** |
+| `embed_minimal_html` | Required to generate | Required to view | ~2 KB + CDN | Sharing with Jupyter users |
 
 ---
 
 ## CI/CD: Auto-Generated Documentation
 
-This site is built automatically by a [GitHub Actions workflow](https://github.com/maedoc/trajecturtle/blob/main/.github/workflows/docs.yml) that:
+This site is built automatically by a GitHub Actions workflow that:
 
 1. Installs the package
 2. Generates standalone HTML demos for each model

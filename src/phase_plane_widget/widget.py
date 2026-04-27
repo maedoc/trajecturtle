@@ -219,15 +219,6 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "integrator": self.integrator,
             "noise_enable": self.noise_enable,
             "noise_sigma": self.noise_sigma,
-            "show_nullclines": self.show_nullclines,
-            "show_vector_field": self.show_vector_field,
-            "show_trajectory": self.show_trajectory,
-            "show_fixed_points": self.show_fixed_points,
-            "nullcline_x": self.nullcline_x,
-            "nullcline_y": self.nullcline_y,
-            "vector_field": self.vector_field,
-            "fixed_points": self.fixed_points,
-            "trajectory": self.trajectory,
         }
 
         html = f"""<!DOCTYPE html>

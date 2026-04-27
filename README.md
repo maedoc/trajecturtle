@@ -7,11 +7,14 @@ Interactive phase plane widget for neural mass models, usable in Jupyter noteboo
 ## Features
 
 - **Interactive phase plane visualization** with nullclines, vector field, fixed points, and trajectories
+- **N-dimensional state space** — project any 2 variables, clamp the rest with live sliders
 - **Click-to-set initial conditions** directly on the phase plane
-- **Real-time time series** display alongside the phase plane
+- **Real-time time series** display of all state variables
+- **Stochastic integration** — Stratonovich Heun with per-variable noise strength sliders
 - **Parameter sweeps** with bifurcation diagram visualization
-- **Regime detection**: automatically classifies dynamics as fixed point, limit cycle, or other
-- **Multiple neural mass models**: Wilson-Cowan (E-I populations), FitzHugh-Nagumo (excitable neuron), MPR (QIF firing-rate)
+- **Regime detection** — automatically classifies dynamics as fixed point, limit cycle, or other
+- **Custom models** — define arbitrary ODEs in Python (SymPy), compile to JavaScript via inlined Nerdamer CAS
+- **Standalone HTML** — fully self-contained exports (no server, no kernel)
 
 ## Installation
 
@@ -29,54 +32,83 @@ For development with Jupyter:
 uv pip install -e ".[dev]"
 ```
 
-## Usage
+## Quick Start
 
-### Jupyter Notebook
+### Jupyter / VS Code — Built-in Models
 
 ```python
 from phase_plane_widget import PhasePlaneWidget
 
 widget = PhasePlaneWidget()
-widget
+widget  # display interactive widget
 ```
 
-### Programmatic Parameter Sweep
+### Custom Model
 
 ```python
-# Run a sweep over the external current I
-widget.run_sweep("I", [-1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0])
+from phase_plane_widget import phase_plane
+
+# Define any ODE system
+pp = phase_plane(
+    equations=["a*x - x**3 - y", "x - b*y"],
+    state_vars={"x": (-3, 3), "y": (-3, 3)},
+    params={"a": (0.7, 0, 2), "b": (0.8, 0, 2)},
+)
+pp  # Nerdamer-compiled, runs entirely in the browser
 ```
 
-### VS Code
-
-Works directly in VS Code's Jupyter extension — no extra configuration needed.
-
-### Static HTML Export
+### 3-D Projection
 
 ```python
-from ipywidgets.embed import embed_minimal_html
-
-embed_minimal_html("export.html", views=[widget], title="Phase Plane Widget")
+pp = phase_plane(
+    equations=["a*x - x**3 - y", "x - b*y", "c*(x - z)"],
+    state_vars={"x": (-3, 3), "y": (-3, 3), "z": (0, 5)},
+    params={"a": (0.7, 0, 2), "b": (0.8, 0, 2), "c": (10, 0, 20)},
+    display=["x", "y"],  # project onto x-y plane
+)
 ```
 
-## Supported Models
+### Stochastic Dynamics
 
-| Model | Description | Parameters |
-|-------|-------------|------------|
-| **Wilson-Cowan** | Excitatory-inhibitory population dynamics | aee, aei, aie, aii, Pe, Pi, ke, ki, thetae, thetai |
-| **FitzHugh-Nagumo** | Excitable neuron, simplified Hodgkin-Huxley | a, b, epsilon, I |
+```python
+pp = phase_plane(
+    equations=["a*x - x**3 - y", "x - b*y"],
+    state_vars={"x": (-3, 3), "y": (-3, 3)},
+    params={"a": (0.7, 0, 2), "b": (0.8, 0, 2)},
+    integrator="heun",
+    noise_per_var=[0.1, 0.05],
+)
+```
+
+### Standalone HTML Export
+
+```python
+from phase_plane_widget import PhasePlaneWidget
+
+widget = PhasePlaneWidget()
+widget.to_standalone_html("widget.html", title="My Model")
+```
+
+The resulting `.html` file is fully self-contained — it bundles the Nerdamer CAS, all built-in models, the computation engine, CSS, and current widget state. Works in any modern browser with **no Python runtime and no Jupyter kernel**.
+
+## Built-in Models
+
+| Model | State Vars | Parameters | Key Dynamics |
+|-------|-----------|------------|-------------|
+| **Wilson-Cowan** | E, I | aee, aei, aie, aii, Pe, Pi, ke, ki, thetae, thetai | E-I population oscillations, bistability |
+| **FitzHugh-Nagumo** | v, w | a, b, epsilon, I | Excitable spiking, limit cycles |
+| **MPR (QIF)** | r, v | delta, eta_bar, J, I | Mean-field firing rate, macroscopic chaos |
 
 ## Architecture
 
-- **Client-side computation**: All ODE solving, fixed-point finding, and rendering runs in JavaScript — no server round-trips
-- **Dual-mode architecture**: Works as a Jupyter widget *and* as a standalone self-contained HTML file
-- **anywidget**: Jupyter/VS Code bridge; `to_standalone_html()` for blogs, docs, and courses
+- **Client-side computation** — All ODE solving, fixed-point finding, and rendering runs in JavaScript (no server round-trips)
+- **Nerdamer CAS inlined** — ~100 KB minified core bundled into `widget.js`; custom SymPy models compile directly to JS
+- **Dual-mode** — Jupyter widget (`anywidget`) + fully self-contained HTML (`to_standalone_html()`)
+- **Safety guards** — NaN/Inf short-circuit, 50K step budget, exp clamping (`[-709, 709]`), computation budgets on nullclines and fixed-point search
 
 ## Documentation
 
-See the [full documentation site](https://maedoc.github.io/trajecturtle/) for:
-
-- **Live interactive demos** (embedded standalone widgets)
-- [Deployment guide](https://maedoc.github.io/trajecturtle/deployment/) — Jupyter, VS Code, standalone HTML, mkdocs
-- [Model reference](https://maedoc.github.io/trajecturtle/models/) — equations, parameters, dynamics
-- [API reference](https://maedoc.github.io/trajecturtle/api/) — auto-generated from docstrings
+- **[Live demos](https://maedoc.github.io/trajecturtle/)** — Embedded standalone widgets
+- **[Deployment guide](https://maedoc.github.io/trajecturtle/deployment/)** — Jupyter, VS Code, standalone HTML, mkdocs
+- **[Model reference](https://maedoc.github.io/trajecturtle/models/)** — Equations, parameters, dynamics
+- **[API reference](https://maedoc.github.io/trajecturtle/api/)** — Auto-generated from docstrings
