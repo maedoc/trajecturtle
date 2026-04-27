@@ -4,6 +4,8 @@ Interactive phase plane widget for neural mass models, usable in Jupyter noteboo
 
 📖 **[Full Documentation & Live Demos](https://maedoc.github.io/trajecturtle/)**
 
+🧪 **[Try the Custom Model Editor →](https://maedoc.github.io/trajecturtle/demos/custom-model-demo.html)** — pre-loaded with the MPR (QIF) model; tweak equations and watch the phase plane update in real time.
+
 ## Features
 
 - **Interactive phase plane visualization** with nullclines, vector field, fixed points, and trajectories

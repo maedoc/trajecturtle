@@ -173,6 +173,8 @@ class PhasePlaneWidget(anywidget.AnyWidget):
         self,
         filename: str | pathlib.Path,
         title: str = "Phase Plane Widget",
+        *,
+        on_render_js: str = "",
     ):
         """Export the widget to a self-contained HTML file.
 
@@ -186,6 +188,9 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             Output path (e.g. ``"widget.html"``).
         title : str
             Page ``<title>``.
+        on_render_js : str
+            Optional JavaScript snippet executed after the widget renders.
+            Useful for auto-opening UI panels (e.g. the live editor).
         """
         js_code = self._esm
         css_code = self._css
@@ -221,6 +226,8 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "noise_sigma": self.noise_sigma,
         }
 
+        extra_js = f"\n{on_render_js}\n" if on_render_js else ""
+
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -252,6 +259,7 @@ const mockModel = {{
 }};
 
 render({{ model: mockModel, el: document.getElementById('ppw-root') }});
+{extra_js}
 </script>
 </body>
 </html>"""
