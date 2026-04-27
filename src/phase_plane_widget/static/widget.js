@@ -14217,10 +14217,38 @@ export function render({ model, el }) {
   }
 
   // ═════════════════════════════════════════════════════════════
-  //  LIVE EDITOR
+  //  LIVE EDITOR with debounced auto-save and state machine
   // ═════════════════════════════════════════════════════════════
 
   let _editorOpen = false;
+  let _editorDebounceTimer = null;
+  let _editorRequestId = 0;
+  let _editorState = "IDLE"; // IDLE | TYPING | PARSING | VALID | ERROR
+  const EDITOR_DEBOUNCE_MS = 500;
+
+  function _setEditorStatus(text) {
+    editorStatus.textContent = text;
+  }
+
+  function _setEditorState(state) {
+    _editorState = state;
+    if (state === "IDLE") _setEditorStatus("");
+    if (state === "TYPING") _setEditorStatus("Typing...");
+    if (state === "PARSING") _setEditorStatus("Parsing...");
+    if (state === "VALID") _setEditorStatus("Valid ✓");
+    if (state === "ERROR") _setEditorStatus("Error ✗");
+  }
+
+  function _clearPerFieldErrors() {
+    editorEquationsDiv.querySelectorAll(".ppw-ed-expr").forEach((ta) => {
+      ta.classList.remove("ppw-error");
+    });
+  }
+
+  function _markEquationError(name) {
+    const div = editorEquationsDiv.querySelector(`.ppw-editor-equation[data-name="${name}"]`);
+    if (div) div.querySelector(".ppw-ed-expr").classList.add("ppw-error");
+  }
 
   function toggleEditor() {
     _editorOpen = !_editorOpen;
@@ -14280,6 +14308,65 @@ export function render({ model, el }) {
       eqHtml += `<div class="ppw-editor-equation" data-name="${name}"><label>d${name}/dt =</label><textarea class="ppw-ed-expr" ${readonly}>${expr}</textarea></div>`;
     }
     editorEquationsDiv.innerHTML = eqHtml;
+
+    _clearPerFieldErrors();
+    _setEditorState("IDLE");
+
+    // Attach debounced input listeners to all editable fields
+    editorPanel.querySelectorAll("input, textarea").forEach((el) => {
+      if (el.readOnly) return;
+      el.addEventListener("input", onEditorInput);
+    });
+  }
+
+  function onEditorInput() {
+    _clearPerFieldErrors();
+    _setEditorState("TYPING");
+    editorError.classList.remove("visible");
+    editorError.textContent = "";
+
+    if (_editorDebounceTimer) clearTimeout(_editorDebounceTimer);
+    _editorDebounceTimer = setTimeout(() => {
+      const thisRequestId = ++_editorRequestId;
+      _tryAutoApply(thisRequestId);
+    }, EDITOR_DEBOUNCE_MS);
+  }
+
+  function _tryAutoApply(requestId) {
+    if (requestId !== _editorRequestId) return; // stale result rejection
+
+    _setEditorState("PARSING");
+
+    const spec = buildModelSpec();
+    const { errors, equationErrors } = validateSpec(spec);
+
+    if (requestId !== _editorRequestId) return;
+
+    if (errors.length > 0) {
+      _setEditorState("ERROR");
+      equationErrors.forEach((name) => _markEquationError(name));
+      editorError.textContent = errors.join("\n");
+      editorError.classList.add("visible");
+      return;
+    }
+
+    try {
+      const entry = compileModelSpec(spec);
+      if (!entry || !entry.f) throw new Error("No executable function");
+    } catch (e) {
+      _setEditorState("ERROR");
+      editorError.textContent = `Compilation error: ${e.message || e}`;
+      editorError.classList.add("visible");
+      return;
+    }
+
+    if (requestId !== _editorRequestId) return;
+
+    model.set("model_spec", spec);
+    model.set("model_name", "custom");
+    if (!isStandalone) model.save_changes();
+    _setEditorState("VALID");
+    computeAll();
   }
 
   function buildModelSpec() {
@@ -14322,57 +14409,33 @@ export function render({ model, el }) {
 
   function validateSpec(spec) {
     const errors = [];
+    const equationErrors = [];
     for (const [name, exprStr] of Object.entries(spec.equations)) {
       try {
         nerdamer(exprStr);
       } catch (e) {
         errors.push(`Equation '${name}': ${e.message || "parse error"}`);
+        equationErrors.push(name);
       }
     }
-    return errors;
+    return { errors, equationErrors };
   }
 
   function applyEditor() {
-    editorError.classList.remove("visible");
-    editorError.textContent = "";
-    editorStatus.textContent = "Validating...";
-
-    const spec = buildModelSpec();
-    const errors = validateSpec(spec);
-    if (errors.length > 0) {
-      editorError.textContent = errors.join("\n");
-      editorError.classList.add("visible");
-      editorStatus.textContent = "Validation failed";
-      return;
-    }
-
-    try {
-      const entry = compileModelSpec(spec);
-      if (!entry || !entry.f) {
-        throw new Error("Compilation produced no executable function");
-      }
-    } catch (e) {
-      editorError.textContent = `Compilation error: ${e.message || e}`;
-      editorError.classList.add("visible");
-      editorStatus.textContent = "Compilation failed";
-      return;
-    }
-
-    model.set("model_spec", spec);
-    model.set("model_name", "custom");
-    if (!isStandalone) model.save_changes();
-    editorStatus.textContent = "Applied — switching to custom model";
-    computeAll();
+    // Manual apply — force immediate application regardless of debounce
+    if (_editorDebounceTimer) clearTimeout(_editorDebounceTimer);
+    _editorRequestId++;
+    _tryAutoApply(_editorRequestId);
   }
 
   function copySpec() {
     const spec = buildModelSpec();
     const json = JSON.stringify(spec, null, 2);
     navigator.clipboard.writeText(json).then(() => {
-      editorStatus.textContent = "Spec copied to clipboard!";
-      setTimeout(() => { editorStatus.textContent = ""; }, 2000);
+      _setEditorStatus("Spec copied to clipboard!");
+      setTimeout(() => { if (_editorState === "IDLE") _setEditorStatus(""); }, 2000);
     }).catch(() => {
-      editorStatus.textContent = "Failed to copy — see browser console";
+      _setEditorStatus("Failed to copy — see browser console");
       console.log(json);
     });
   }
