@@ -21,7 +21,7 @@ widget
 3. **All subsequent interaction** (sliders, clicks, sweeps, noise toggles) is handled by JavaScript
 4. Python can still read back computed data (nullclines, fixed points, trajectories) via synced traitlets
 
-### Custom Models in Jupyter
+### Custom Models in Jupyter {#custom-models}
 
 ```python
 from phase_plane_widget import phase_plane
