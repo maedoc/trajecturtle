@@ -13495,6 +13495,10 @@ export function render({ model, el }) {
           <button class="ppw-sweep-btn">Run Sweep</button>
           <span class="ppw-sweep-status"></span>
         </div>
+        <div class="ppw-sweep-progress">
+          <div class="ppw-sweep-progress-bar" style="width: 0%"></div>
+          <span class="ppw-sweep-progress-text"></span>
+        </div>
         <canvas class="ppw-sweep-canvas" width="700" height="300"></canvas>
         <div class="ppw-legend">
           <div class="ppw-legend-item"><div class="ppw-legend-dot" style="background:#4CAF50"></div> Stable</div>
@@ -13521,6 +13525,9 @@ export function render({ model, el }) {
   const sweepNIn = el.querySelector(".ppw-sweep-n");
   const sweepBtn = el.querySelector(".ppw-sweep-btn");
   const sweepStatus = el.querySelector(".ppw-sweep-status");
+  const sweepProgressBar = el.querySelector(".ppw-sweep-progress-bar");
+  const sweepProgressText = el.querySelector(".ppw-sweep-progress-text");
+  const sweepProgress = el.querySelector(".ppw-sweep-progress");
   const sweepCanvas = el.querySelector(".ppw-sweep-canvas");
   const showNull = el.querySelector(".ppw-show-null");
   const showVf = el.querySelector(".ppw-show-vf");
@@ -13906,50 +13913,95 @@ export function render({ model, el }) {
     computeAll();
   });
 
-  // ── Sweep ──
+  // ── Sweep (async chunked with live progress) ──
+  let _sweepAbort = null;
+
   sweepBtn.addEventListener("click", () => {
     const param = sweepSelect.value;
     const min = parseFloat(sweepMinIn.value);
     const max = parseFloat(sweepMaxIn.value);
-    const n = parseInt(sweepNIn.value);
-    if (isNaN(min) || isNaN(max) || isNaN(n) || n < 2) return;
+    const nSweep = parseInt(sweepNIn.value);
+    if (isNaN(min) || isNaN(max) || isNaN(nSweep) || nSweep < 2) return;
 
     sweepBtn.disabled = true;
     sweepStatus.innerHTML = '<span class="ppw-sweep-spinner"></span> Running...';
+    sweepProgress.classList.add("visible");
+    sweepProgressBar.style.width = "0%";
+    sweepProgressText.textContent = "0%";
 
-    setTimeout(() => {
-      const modelName = model.get("model_name");
-      const params = model.get("params");
-      const xlim = model.get("xlim");
-      const ylim = model.get("ylim");
-      let def;
-      if (modelName === 'custom' && model.get('model_spec')) {
-        const spec = model.get('model_spec');
-        if (spec && spec.equations && Object.keys(spec.equations).length > 0) {
-          try { def = compileModelSpec(spec); } catch (e) { def = MODELS.wilson_cowan; }
-        } else { def = MODELS[modelName] || MODELS.wilson_cowan; }
-      } else { def = MODELS[modelName]; }
-      const display = model.get("display") || def.display || [0, 1];
-      const stateVars = def.stateVars || def.stateNames || [];
-      const n = stateVars.length;
-      let clamped = model.get("clamped");
-      if (!clamped || clamped.length !== n) {
-        clamped = stateVars.map((_, i) => {
-          const lims = (def.defaultLims && def.defaultLims[i]) || [-1, 1];
-          return (lims[0] + lims[1]) / 2;
-        });
+    const modelName = model.get("model_name");
+    const params = model.get("params");
+    const xlim = model.get("xlim");
+    const ylim = model.get("ylim");
+    let def;
+    if (modelName === 'custom' && model.get('model_spec')) {
+      const spec = model.get('model_spec');
+      if (spec && spec.equations && Object.keys(spec.equations).length > 0) {
+        try { def = compileModelSpec(spec); } catch (e) { def = MODELS.wilson_cowan; }
+      } else { def = MODELS[modelName] || MODELS.wilson_cowan; }
+    } else { def = MODELS[modelName]; }
+    const display = model.get("display") || def.display || [0, 1];
+    const stateVars = def.stateVars || def.stateNames || [];
+    const dim = stateVars.length;
+    let clamped = model.get("clamped");
+    if (!clamped || clamped.length !== dim) {
+      clamped = stateVars.map((_, i) => {
+        const lims = (def.defaultLims && def.defaultLims[i]) || [-1, 1];
+        return (lims[0] + lims[1]) / 2;
+      });
+    }
+    const fProj = makeProjectedRHS(modelName, display, clamped);
+    const sweepModelArg = (modelName === 'custom' && def && def.f) ? def : modelName;
+
+    const values = linspace(min, max, nSweep);
+    const results = [];
+    const allFps = [];
+    let idx = 0;
+    const CHUNK = 2;
+    let aborted = false;
+    _sweepAbort = () => { aborted = true; };
+
+    function step() {
+      if (aborted) {
+        sweepBtn.disabled = false;
+        sweepStatus.innerHTML = "Aborted";
+        sweepProgress.classList.remove("visible");
+        _sweepAbort = null;
+        return;
       }
-      const fProj = makeProjectedRHS(modelName, display, clamped);
-      const sweepModelArg = (modelName === 'custom' && def && def.f) ? def : modelName;
-      const result = runParameterSweep(fProj, sweepModelArg, param, params, min, max, n, xlim, ylim, display);
-      model.set("sweep_results", result.results);
-      model.set("sweep_fixed_points", result.allFps);
-      model.set("sweep_param", param);
-      if (!isStandalone) model.save_changes();
-      renderSweep();
-      sweepBtn.disabled = false;
-      sweepStatus.innerHTML = "";
-    }, 10);
+
+      const end = Math.min(idx + CHUNK, values.length);
+      for (; idx < end; idx++) {
+        const val = values[idx];
+        const p = { ...params, [param]: val };
+        const regime = detectRegime(sweepModelArg, p, xlim, ylim, display, 60, 0.05);
+        const fps = findFixedPoints(fProj, p, xlim, ylim, 15);
+        results.push({ param_value: val, regime, num_fixed_points: fps.length });
+        for (const fp of fps) allFps.push([val, fp[0], fp[1], fp[2]]);
+      }
+
+      const pct = Math.round((idx / values.length) * 100);
+      sweepProgressBar.style.width = pct + "%";
+      sweepProgressText.textContent = pct + "%";
+
+      // Live render with partial data
+      _renderSweepData(results, allFps, param);
+
+      if (idx < values.length) {
+        setTimeout(step, 0);
+      } else {
+        model.set("sweep_results", results);
+        model.set("sweep_fixed_points", allFps);
+        model.set("sweep_param", param);
+        if (!isStandalone) model.save_changes();
+        _sweepAbort = null;
+        sweepBtn.disabled = false;
+        sweepStatus.innerHTML = "";
+        sweepProgress.classList.remove("visible");
+      }
+    }
+
+    step();
   });
 
   // ═════════════════════════════════════════════════════════════
@@ -14142,27 +14194,31 @@ export function render({ model, el }) {
   }
 
   function renderSweep() {
-    const w = sweepCanvas.width, h = sweepCanvas.height;
     const results = model.get("sweep_results");
     const fps = model.get("sweep_fixed_points");
+    _renderSweepData(results, fps, model.get("sweep_param"));
+  }
+
+  function _renderSweepData(_results, _fps, _paramName) {
+    const w = sweepCanvas.width, h = sweepCanvas.height;
     sweepCtx.clearRect(0, 0, w, h);
     sweepCtx.fillStyle = "#fafafa"; sweepCtx.fillRect(0, 0, w, h);
-    if (!results || results.length === 0) return;
+    if (!_results || _results.length === 0) return;
 
-    const paramValues = results.map((r) => r.param_value);
+    const paramValues = _results.map((r) => r.param_value);
     const pMin = Math.min(...paramValues), pMax = Math.max(...paramValues);
     let yMin = Infinity, yMax = -Infinity;
-    if (fps && fps.length > 0) {
-      for (const [, x, y] of fps) { yMin = Math.min(yMin, x, y); yMax = Math.max(yMax, x, y); }
+    if (_fps && _fps.length > 0) {
+      for (const [, x, y] of _fps) { yMin = Math.min(yMin, x, y); yMax = Math.max(yMax, x, y); }
     } else { yMin = -1; yMax = 1; }
     const yMargin = (yMax - yMin) * 0.1; yMin -= yMargin; yMax += yMargin;
     const pad = 35, plotW = w - 2 * pad, plotH = h - 2 * pad;
 
     // Regime shading
-    if (results.length > 1) {
-      const dp = (pMax - pMin) / (results.length - 1);
-      for (let i = 0; i < results.length; i++) {
-        const r = results[i];
+    if (_results.length > 1) {
+      const dp = (pMax - pMin) / (_results.length - 1);
+      for (let i = 0; i < _results.length; i++) {
+        const r = _results[i];
         const color = REGIME_COLORS[r.regime] || "#f5f5f5";
         const sx1 = pad + ((r.param_value - pMin) / (pMax - pMin)) * plotW;
         const sx2 = pad + ((r.param_value + dp - pMin) / (pMax - pMin)) * plotW;
@@ -14201,13 +14257,13 @@ export function render({ model, el }) {
     }
 
     sweepCtx.textAlign = "center"; sweepCtx.textBaseline = "bottom"; sweepCtx.font = "bold 11px sans-serif";
-    sweepCtx.fillText(model.get("sweep_param") || "Parameter", w / 2, h - 4);
+    sweepCtx.fillText(_paramName || "Parameter", w / 2, h - 4);
     sweepCtx.save(); sweepCtx.translate(12, h / 2); sweepCtx.rotate(-Math.PI / 2);
     sweepCtx.textAlign = "center"; sweepCtx.textBaseline = "top"; sweepCtx.fillText("Fixed Point State", 0, 0); sweepCtx.restore();
 
     // Fixed points
-    if (fps && fps.length > 0) {
-      for (const [pval, x, y, stability] of fps) {
+    if (_fps && _fps.length > 0) {
+      for (const [pval, x, y, stability] of _fps) {
         const sx = pad + ((pval - pMin) / (pMax - pMin)) * plotW;
         const sy1 = h - pad - ((x - yMin) / (yMax - yMin)) * plotH;
         const sy2 = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;

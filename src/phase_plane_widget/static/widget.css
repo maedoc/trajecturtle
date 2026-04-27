@@ -336,6 +336,37 @@
     100% { transform: rotate(360deg); }
 }
 
+.ppw-sweep-progress {
+    width: 100%;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    position: relative;
+    display: none;
+}
+
+.ppw-sweep-progress.visible {
+    display: block;
+}
+
+.ppw-sweep-progress-bar {
+    height: 100%;
+    background: #2196F3;
+    transition: width 0.1s linear;
+    border-radius: 4px;
+}
+
+.ppw-sweep-progress-text {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: #666;
+}
+
 .ppw-legend {
     display: flex;
     flex-wrap: wrap;
