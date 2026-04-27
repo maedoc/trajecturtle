@@ -44,7 +44,7 @@ This demo pre-loads the **MPR (QIF)** equations into the live editor so you can 
 
 The editor is open by default — edit the equations and the plots update automatically (debounced 500 ms).
 
-<iframe src="custom-model-demo.html" width="100%" height="750" frameborder="0" style="border:1px solid #ddd; border-radius:8px;"></iframe>
+<iframe src="custom-model-demo.html" width="100%" height="1400" frameborder="0" style="border:1px solid #ddd; border-radius:8px;"></iframe>
 
 ---
 
