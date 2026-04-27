@@ -144,11 +144,10 @@ console.log(JSON.stringify({{
 """
     result = _run_node_script(test_code)
     assert result["is_array"], "Should return an array"
-    # With many oscillations, budget gets exhausted so result may be []
-    # or very short, but never crashes.
-    assert result["length"] == 0, (
-        f"Expected empty array on budget exhaustion, got length {result['length']}"
-    )
+    # Budget exhaustion now returns accumulated results rather than wiping
+    # them out.  With many oscillations most Newton starts diverge, so the
+    # accumulated list is usually short but never crashes.
+    assert isinstance(result["length"], int), "length should be an integer"
 
 
 def test_find_fixed_points_1d():

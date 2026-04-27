@@ -13035,7 +13035,7 @@ function classifyFixedPoint(eigenvalues) {
 
 /** Grid-search + Newton-Raphson fixed-point finder (1D/2D). */
 function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
-  const MAX_ITER_TOTAL = 625;
+  const MAX_ITER_TOTAL = Math.max(625, nGrid * nGrid * 10);
   let iterCount = 0;
   const tol = 0.08;
   const fixedPoints = [];
@@ -13049,7 +13049,7 @@ function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
       for (let iter = 0; iter < 50; iter++) {
         if (iterCount >= MAX_ITER_TOTAL) {
           console.warn('Budget exhausted: findFixedPoints');
-          return [];
+          return fixedPoints;
         }
         iterCount++;
         const fx = f(0, [x], params)[0];
@@ -13087,7 +13087,7 @@ function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
         for (let iter = 0; iter < 50; iter++) {
           if (iterCount >= MAX_ITER_TOTAL) {
             console.warn('Budget exhausted: findFixedPoints');
-            return [];
+            return fixedPoints;
           }
           iterCount++;
           const fx = f(0, x, params);
@@ -13132,7 +13132,7 @@ function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
 
 /** Nullcline computation via grid zero-crossings. */
 function computeNullclines(f, params, xlim, ylim, nGrid = 60) {
-  const MAX_EVAL = 3600;
+  const MAX_EVAL = Math.max(3600, nGrid * nGrid + 100);
   let evalCount = 0;
   // f is a projected RHS function
   const xs = linspace(xlim[0], xlim[1], nGrid);
@@ -13146,7 +13146,7 @@ function computeNullclines(f, params, xlim, ylim, nGrid = 60) {
     for (let i = 0; i < xs.length; i++) {
       if (evalCount >= MAX_EVAL) {
         console.warn('Budget exhausted: computeNullclines');
-        return [[], []];
+        return [zeroX, []];
       }
       evalCount++;
       const d = f(0, [xs[i]], params);
@@ -13171,7 +13171,7 @@ function computeNullclines(f, params, xlim, ylim, nGrid = 60) {
     for (let j = 0; j < nGrid; j++) {
       if (evalCount >= MAX_EVAL) {
         console.warn('Budget exhausted: computeNullclines');
-        return [[], []];
+        return [_findZeroCrossings(dx), _findZeroCrossings(dy)];
       }
       evalCount++;
       const d = f(0, [xs[j], ys[i]], params);
@@ -13209,7 +13209,7 @@ function computeNullclines(f, params, xlim, ylim, nGrid = 60) {
 
 /** Sparse vector field (1D/2D). */
 function computeVectorField(f, params, xlim, ylim, nGrid = 12) {
-  const MAX_VECTORS = 144;
+  const MAX_VECTORS = Math.max(144, nGrid * nGrid + 10);
   const xs = linspace(xlim[0], xlim[1], nGrid);
   const test = f(0, [(xlim[0] + xlim[1]) / 2], params);
   const is1D = test.length === 1;
@@ -13220,7 +13220,7 @@ function computeVectorField(f, params, xlim, ylim, nGrid = 12) {
     for (const xi of xs) {
       if (count >= MAX_VECTORS) {
         console.warn('Budget exhausted: computeVectorField');
-        return [];
+        return vectors;
       }
       count++;
       const d = f(0, [xi], params);
@@ -13232,7 +13232,7 @@ function computeVectorField(f, params, xlim, ylim, nGrid = 12) {
       for (const yi of ys) {
         if (count >= MAX_VECTORS) {
           console.warn('Budget exhausted: computeVectorField');
-          return [];
+          return vectors;
         }
         count++;
         const d = f(0, [xi, yi], params);
