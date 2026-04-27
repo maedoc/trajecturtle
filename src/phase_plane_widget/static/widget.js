@@ -28,6 +28,8 @@ const MODELS = {
   wilson_cowan: {
     dim: 2,
     stateNames: ["E", "I"],
+    stateVars: ["E", "I"],
+    display: [0, 1],
     defaultParams: {
       aee: 10.0, aei: 10.0, aie: 10.0, aii: 2.0,
       Pe: -2.0, Pi: -8.0,
@@ -48,6 +50,7 @@ const MODELS = {
     },
     defaultXlim: [-0.2, 1.2],
     defaultYlim: [-0.2, 1.2],
+    defaultLims: [[-0.2, 1.2], [-0.2, 1.2]],
     f: (_t, [E, I], p) => {
       const Se = (x) => _sigmoid(x, p.ke, p.thetae);
       const Si = (x) => _sigmoid(x, p.ki, p.thetai);
@@ -61,6 +64,8 @@ const MODELS = {
   fitzhugh_nagumo: {
     dim: 2,
     stateNames: ["v", "w"],
+    stateVars: ["v", "w"],
+    display: [0, 1],
     defaultParams: { a: 0.7, b: 0.8, epsilon: 0.08, I: 0.5 },
     paramInfo: {
       a: [-1.0, 2.0, 0.7, "Recovery offset"],
@@ -70,6 +75,7 @@ const MODELS = {
     },
     defaultXlim: [-3.0, 3.0],
     defaultYlim: [-1.5, 2.0],
+    defaultLims: [[-3.0, 3.0], [-1.5, 2.0]],
     f: (_t, [v, w], p) => [
       v - (v * v * v) / 3.0 - w + p.I,
       p.epsilon * (v + p.a - p.b * w),
@@ -79,6 +85,8 @@ const MODELS = {
   mpr: {
     dim: 2,
     stateNames: ["r", "v"],
+    stateVars: ["r", "v"],
+    display: [0, 1],
     defaultParams: { delta: 1.0, eta_bar: -5.0, J: 15.0, I: 0.0 },
     paramInfo: {
       delta: [0.01, 5.0, 1.0, "Lorentzian half-width Δ"],
@@ -88,6 +96,7 @@ const MODELS = {
     },
     defaultXlim: [0.0, 2.0],
     defaultYlim: [-4.0, 2.0],
+    defaultLims: [[0.0, 2.0], [-4.0, 2.0]],
     f: (_t, [r, v], p) => {
       const r_eff = Math.max(r, 1e-10);
       const dr = p.delta / Math.PI + 2.0 * r_eff * v;
@@ -108,8 +117,32 @@ function linspace(a, b, n) {
   return result;
 }
 
+/** Build a projected RHS function for a subset of state variables.
+ *
+ *  @param {string} modelName — key in MODELS
+ *  @param {number[]} displayIdx — indices of displayed state variables
+ *  @param {number[]} clamped — full N-dim state vector with clamped values
+ *  @returns {Function} f_proj(t, projState, params) → derivatives of displayed vars
+ */
+function makeProjectedRHS(modelName, displayIdx, clamped) {
+  const fullF = MODELS[modelName].f;
+  const n = (MODELS[modelName].stateVars || MODELS[modelName].stateNames || []).length;
+  const clampedCopy = [...clamped];
+  return function (t, projState, params) {
+    const fullState = new Array(n);
+    for (let i = 0; i < n; i++) fullState[i] = clampedCopy[i];
+    for (let i = 0; i < displayIdx.length; i++) {
+      fullState[displayIdx[i]] = projState[i];
+    }
+    const dFull = fullF(t, fullState, params);
+    const result = [];
+    for (const idx of displayIdx) result.push(dFull[idx]);
+    return result;
+  };
+}
+
 /** Fixed-step RK4 ODE solver.
- *  Returns array of [t, x1, x2, ...] rows.  */
+ *  Returns array of [t, v0, v1, ...] rows.  */
 function rk4(modelName, y0, t0, tf, h, params) {
   const f = MODELS[modelName].f;
   const results = [[t0, ...y0]];
@@ -130,19 +163,18 @@ function rk4(modelName, y0, t0, tf, h, params) {
   return results;
 }
 
-/** Numerical Jacobian (2D only). */
-function jacobian2D(f, state, params, eps = 1e-6) {
+/** Numerical Jacobian (works for 1-D or 2-D projected systems). */
+function jacobianND(f, state, params, eps = 1e-6) {
+  const dim = state.length;
   const f0 = f(0, state, params);
-  const J = [
-    [0, 0],
-    [0, 0],
-  ];
-  for (let i = 0; i < 2; i++) {
+  const J = Array.from({ length: dim }, () => new Array(dim).fill(0));
+  for (let i = 0; i < dim; i++) {
     const sPlus = [...state];
     sPlus[i] += eps;
     const fPlus = f(0, sPlus, params);
-    J[0][i] = (fPlus[0] - f0[0]) / eps;
-    J[1][i] = (fPlus[1] - f0[1]) / eps;
+    for (let j = 0; j < dim; j++) {
+      J[j][i] = (fPlus[j] - f0[j]) / eps;
+    }
   }
   return J;
 }
@@ -177,8 +209,7 @@ function classifyFixedPoint(eigenvalues) {
 }
 
 /** Grid-search + Newton-Raphson fixed-point finder (2D). */
-function findFixedPoints(modelName, params, xlim, ylim, nGrid = 25) {
-  const f = MODELS[modelName].f;
+function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
   const tol = 0.08;
   const fixedPoints = [];
   const xs = linspace(xlim[0], xlim[1], nGrid);
@@ -208,14 +239,14 @@ function findFixedPoints(modelName, params, xlim, ylim, nGrid = 25) {
               }
             }
             if (isNew) {
-              const J = jacobian2D(f, x, params);
+              const J = jacobianND(f, x, params);
               const ev = eigenvalues2x2(J);
               fixedPoints.push([x[0], x[1], classifyFixedPoint(ev)]);
             }
           }
           break;
         }
-        const J = jacobian2D(f, x, params, 1e-6);
+        const J = jacobianND(f, x, params, 1e-6);
         const det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
         if (Math.abs(det) < 1e-12) break;
         const dx0 = (-fx[0] * J[1][1] + fx[1] * J[0][1]) / det;
@@ -228,8 +259,8 @@ function findFixedPoints(modelName, params, xlim, ylim, nGrid = 25) {
 }
 
 /** Nullcline computation via grid zero-crossings. */
-function computeNullclines(modelName, params, xlim, ylim, nGrid = 60) {
-  const f = MODELS[modelName].f;
+function computeNullclines(f, xlim, ylim, nGrid = 60) {
+  // f is a projected RHS function
   const x = linspace(xlim[0], xlim[1], nGrid);
   const y = linspace(ylim[0], ylim[1], nGrid);
   const dx = Array(nGrid).fill(0).map(() => Array(nGrid).fill(0));
@@ -271,8 +302,8 @@ function computeNullclines(modelName, params, xlim, ylim, nGrid = 60) {
 }
 
 /** Sparse vector field. */
-function computeVectorField(modelName, params, xlim, ylim, nGrid = 12) {
-  const f = MODELS[modelName].f;
+function computeVectorField(f, xlim, ylim, nGrid = 12) {
+  // f is a projected RHS function
   const xs = linspace(xlim[0], xlim[1], nGrid);
   const ys = linspace(ylim[0], ylim[1], nGrid);
   const vectors = [];
@@ -286,12 +317,15 @@ function computeVectorField(modelName, params, xlim, ylim, nGrid = 12) {
 }
 
 /** Detect regime by simulation from multiple ICs. */
-function detectRegime(modelName, params, xlim, ylim, tTotal = 120, dt = 0.05) {
-  const ics = [
-    [xlim[0] * 0.6, ylim[0] * 0.6],
-    [xlim[1] * 0.6, ylim[1] * 0.6],
-    [(xlim[0] + xlim[1]) * 0.5, (ylim[0] + ylim[1]) * 0.5],
-  ];
+function detectRegime(modelName, params, xlim, ylim, display, tTotal = 120, dt = 0.05) {
+  const is1D = !ylim || display.length === 1;
+  const ics = is1D
+    ? [[xlim[0] * 0.6], [xlim[1] * 0.6], [(xlim[0] + xlim[1]) * 0.5]]
+    : [
+        [xlim[0] * 0.6, ylim[0] * 0.6],
+        [xlim[1] * 0.6, ylim[1] * 0.6],
+        [(xlim[0] + xlim[1]) * 0.5, (ylim[0] + ylim[1]) * 0.5],
+      ];
   const regimes = [];
   for (const ic of ics) {
     const traj = rk4(modelName, ic, 0, tTotal, dt, params);
@@ -299,23 +333,28 @@ function detectRegime(modelName, params, xlim, ylim, tTotal = 120, dt = 0.05) {
     const nCheck = Math.min(200, Math.floor(traj.length / 4));
     if (nCheck < 10) { regimes.push("other"); continue; }
     const last = traj.slice(-nCheck);
-    const xVals = last.map((r) => r[1]);
-    const yVals = last.map((r) => r[2]);
+    const xVals = last.map((r) => r[display[0] + 1]);
     const meanX = xVals.reduce((a, b) => a + b) / xVals.length;
-    const meanY = yVals.reduce((a, b) => a + b) / yVals.length;
     const stdX = Math.sqrt(xVals.reduce((s, v) => s + (v - meanX) ** 2, 0) / xVals.length);
-    const stdY = Math.sqrt(yVals.reduce((s, v) => s + (v - meanY) ** 2, 0) / yVals.length);
-    if (stdX < 0.025 && stdY < 0.025) {
-      regimes.push("fixed_point");
+    if (is1D) {
+      // 1-D: no limit cycles possible
+      regimes.push(stdX < 0.025 ? "fixed_point" : "other");
     } else {
-      const mid = Math.floor(last.length / 2);
-      const amp1x = Math.max(...xVals.slice(0, mid)) - Math.min(...xVals.slice(0, mid));
-      const amp2x = Math.max(...xVals.slice(mid)) - Math.min(...xVals.slice(mid));
-      const amp1y = Math.max(...yVals.slice(0, mid)) - Math.min(...yVals.slice(0, mid));
-      const amp2y = Math.max(...yVals.slice(mid)) - Math.min(...yVals.slice(mid));
-      const xStable = Math.abs(amp1x - amp2x) < 0.15 * Math.max(amp1x, 0.01);
-      const yStable = Math.abs(amp1y - amp2y) < 0.15 * Math.max(amp1y, 0.01);
-      regimes.push(xStable && yStable ? "limit_cycle" : "other");
+      const yVals = last.map((r) => r[display[1] + 1]);
+      const meanY = yVals.reduce((a, b) => a + b) / yVals.length;
+      const stdY = Math.sqrt(yVals.reduce((s, v) => s + (v - meanY) ** 2, 0) / yVals.length);
+      if (stdX < 0.025 && stdY < 0.025) {
+        regimes.push("fixed_point");
+      } else {
+        const mid = Math.floor(last.length / 2);
+        const amp1x = Math.max(...xVals.slice(0, mid)) - Math.min(...xVals.slice(0, mid));
+        const amp2x = Math.max(...xVals.slice(mid)) - Math.min(...xVals.slice(mid));
+        const amp1y = Math.max(...yVals.slice(0, mid)) - Math.min(...yVals.slice(0, mid));
+        const amp2y = Math.max(...yVals.slice(mid)) - Math.min(...yVals.slice(mid));
+        const xStable = Math.abs(amp1x - amp2x) < 0.15 * Math.max(amp1x, 0.01);
+        const yStable = Math.abs(amp1y - amp2y) < 0.15 * Math.max(amp1y, 0.01);
+        regimes.push(xStable && yStable ? "limit_cycle" : "other");
+      }
     }
   }
   const counts = {};
@@ -328,14 +367,14 @@ function detectRegime(modelName, params, xlim, ylim, tTotal = 120, dt = 0.05) {
 }
 
 /** Parameter sweep in pure JS. */
-function runParameterSweep(modelName, sweepParam, params, vmin, vmax, n, xlim, ylim) {
+function runParameterSweep(f, modelName, sweepParam, params, vmin, vmax, n, xlim, ylim, display) {
   const values = linspace(vmin, vmax, n);
   const results = [];
   const allFps = [];
   for (const val of values) {
     const p = { ...params, [sweepParam]: val };
-    const regime = detectRegime(modelName, p, xlim, ylim);
-    const fps = findFixedPoints(modelName, p, xlim, ylim, 15);
+    const regime = detectRegime(modelName, p, xlim, ylim, display, 60, 0.05);
+    const fps = findFixedPoints(f, p, xlim, ylim, 15);
     results.push({ param_value: val, regime, num_fixed_points: fps.length });
     for (const fp of fps) allFps.push([val, fp[0], fp[1], fp[2]]);
   }
@@ -427,7 +466,15 @@ export function render({ model, el }) {
             <select class="ppw-model-select"></select>
           </label>
         </div>
-        <div class="ppw-params"></div>
+        <div class="ppw-control-row ppw-state-selector" style="display:none">
+          <label class="ppw-label">X axis:
+            <select class="ppw-state-x"></select>
+          </label>
+          <label class="ppw-label">Y axis:
+            <select class="ppw-state-y"></select>
+          </label>
+        </div>
+        <div class="ppw-clamped-sliders"></div>
         <div class="ppw-control-row ppw-limits">
           <label class="ppw-label">X:
             <input class="ppw-xmin" type="number" step="0.1">
@@ -516,6 +563,10 @@ export function render({ model, el }) {
   const phaseCtx = phaseCanvas.getContext("2d");
   const timeCtx = timeCanvas.getContext("2d");
   const sweepCtx = sweepCanvas.getContext("2d");
+  const stateXSelect = el.querySelector(".ppw-state-x");
+  const stateYSelect = el.querySelector(".ppw-state-y");
+  const stateSelectorRow = el.querySelector(".ppw-state-selector");
+  const clampedDiv = el.querySelector(".ppw-clamped-sliders");
 
   const MODEL_NAMES = ["wilson_cowan", "fitzhugh_nagumo", "mpr"];
   const MODEL_LABELS = { wilson_cowan: "Wilson-Cowan", fitzhugh_nagumo: "FitzHugh-Nagumo", mpr: "MPR (QIF)" };
@@ -533,21 +584,42 @@ export function render({ model, el }) {
     const x0 = model.get("x0");
     const y0 = model.get("y0");
 
-    // Nullclines
-    const [ncX, ncY] = computeNullclines(modelName, params, xlim, ylim, 60);
+    const def = MODELS[modelName];
+    const stateVars = def.stateVars || def.stateNames || [];
+    const n = stateVars.length;
+
+    // Display indices and clamped (non-displayed) state variable values
+    const display = model.get("display") || def.display || [0, 1];
+    let clamped = model.get("clamped");
+    if (!clamped || clamped.length !== n) {
+      clamped = stateVars.map((_, i) => {
+        const lims = (def.defaultLims && def.defaultLims[i]) || [-1, 1];
+        return (lims[0] + lims[1]) / 2;
+      });
+      model.set("clamped", clamped);
+    }
+
+    // Projected RHS for phase-plane computations
+    const fProj = makeProjectedRHS(modelName, display, clamped);
+
+    // Nullclines (projected 2-D slice)
+    const [ncX, ncY] = computeNullclines(fProj, xlim, ylim, 60);
     model.set("nullcline_x", ncX);
     model.set("nullcline_y", ncY);
 
-    // Vector field
-    const vf = computeVectorField(modelName, params, xlim, ylim, 12);
+    // Vector field (projected)
+    const vf = computeVectorField(fProj, xlim, ylim, 12);
     model.set("vector_field", vf);
 
-    // Fixed points
-    const fps = findFixedPoints(modelName, params, xlim, ylim, 25);
+    // Fixed points (projected slice)
+    const fps = findFixedPoints(fProj, params, xlim, ylim, 25);
     model.set("fixed_points", fps);
 
-    // Trajectory
-    const traj = rk4(modelName, [x0, y0], 0, tMax, 0.01, params);
+    // Trajectory: integrate the full N-dimensional system
+    const fullState0 = [...clamped];
+    fullState0[display[0]] = x0;
+    if (display.length > 1) fullState0[display[1]] = y0;
+    const traj = rk4(modelName, fullState0, 0, tMax, 0.01, params);
     const step = Math.max(1, Math.floor(traj.length / 2000));
     const trajDisplay = traj.filter((_, i) => i % step === 0);
     model.set("trajectory", trajDisplay);
@@ -573,15 +645,37 @@ export function render({ model, el }) {
     const def = MODELS[newModel];
     model.set("model_name", newModel);
     model.set("param_info", def.paramInfo);
-    model.set("state_names", def.stateNames);
+    model.set("state_names", def.stateVars || def.stateNames);
     model.set("params", { ...def.defaultParams });
-    model.set("xlim", [...def.defaultXlim]);
-    model.set("ylim", [...def.defaultYlim]);
-    model.set("x0", def.defaultXlim[0] + 0.1 * (def.defaultXlim[1] - def.defaultXlim[0]));
-    model.set("y0", def.defaultYlim[0] + 0.1 * (def.defaultYlim[1] - def.defaultYlim[0]));
+
+    // Reset display and clamped for new model
+    const display = def.display || [0, 1];
+    model.set("display", display);
+    const stateVars = def.stateVars || def.stateNames || [];
+    const clamped = stateVars.map((_, i) => {
+      const lims = (def.defaultLims && def.defaultLims[i]) || [-1, 1];
+      return (lims[0] + lims[1]) / 2;
+    });
+    model.set("clamped", clamped);
+
+    // Use defaultLims for displayed variables, fall back to defaultXlim/defaultYlim
+    if (def.defaultLims && def.defaultLims[display[0]]) {
+      model.set("xlim", [...def.defaultLims[display[0]]]);
+    } else {
+      model.set("xlim", [...def.defaultXlim]);
+    }
+    if (display.length > 1 && def.defaultLims && def.defaultLims[display[1]]) {
+      model.set("ylim", [...def.defaultLims[display[1]]]);
+    } else {
+      model.set("ylim", [...def.defaultYlim]);
+    }
+    model.set("x0", model.get("xlim")[0] + 0.1 * (model.get("xlim")[1] - model.get("xlim")[0]));
+    model.set("y0", model.get("ylim")[0] + 0.1 * (model.get("ylim")[1] - model.get("ylim")[0]));
     if (!isStandalone) model.save_changes();
     createParamSliders(def.paramInfo, def.defaultParams);
     updateLimitInputs();
+    populateStateSelectors(def, display);
+    createClampedSliders(def, clamped, display);
     computeAll();
   });
 
@@ -624,6 +718,93 @@ export function render({ model, el }) {
       sweepMinIn.value = min;
       sweepMaxIn.value = max;
     }
+  }
+
+  // ── State variable selector ──
+  function populateStateSelectors(def, display) {
+    const stateVars = def.stateVars || def.stateNames || [];
+    const n = stateVars.length;
+    if (n <= 2) {
+      stateSelectorRow.style.display = "none";
+      return;
+    }
+    stateSelectorRow.style.display = "flex";
+    stateXSelect.innerHTML = stateVars.map((name, i) =>
+      `<option value="${i}" ${display[0] === i ? "selected" : ""}>${name}</option>`
+    ).join("");
+    stateYSelect.innerHTML = stateVars.map((name, i) =>
+      `<option value="${i}" ${display[1] === i ? "selected" : ""}>${name}</option>`
+    ).join("");
+  }
+
+  stateXSelect.addEventListener("change", () => {
+    const xIdx = parseInt(stateXSelect.value);
+    const yIdx = parseInt(stateYSelect.value);
+    if (xIdx === yIdx) {
+      stateYSelect.value = (xIdx + 1) % (MODELS[model.get("model_name")].stateVars || []).length;
+    }
+    const display = [parseInt(stateXSelect.value), parseInt(stateYSelect.value)];
+    model.set("display", display);
+    if (!isStandalone) model.save_changes();
+    computeAll();
+  });
+
+  stateYSelect.addEventListener("change", () => {
+    const xIdx = parseInt(stateXSelect.value);
+    const yIdx = parseInt(stateYSelect.value);
+    if (xIdx === yIdx) {
+      stateXSelect.value = (yIdx + 1) % (MODELS[model.get("model_name")].stateVars || []).length;
+    }
+    const display = [parseInt(stateXSelect.value), parseInt(stateYSelect.value)];
+    model.set("display", display);
+    if (!isStandalone) model.save_changes();
+    computeAll();
+  });
+
+  // ── Clamped state variable sliders ──
+  function createClampedSliders(def, clamped, display) {
+    const stateVars = def.stateVars || def.stateNames || [];
+    const n = stateVars.length;
+    if (n <= 2) {
+      clampedDiv.style.display = "none";
+      clampedDiv.innerHTML = "";
+      return;
+    }
+    clampedDiv.style.display = "block";
+    const indices = [];
+    for (let i = 0; i < n; i++) {
+      if (!display.includes(i)) indices.push(i);
+    }
+    if (indices.length === 0) {
+      clampedDiv.style.display = "none";
+      return;
+    }
+    const lims = def.defaultLims || Array(n).fill([-5, 5]);
+    let html = '<div style="font-size:11px;color:#666;margin-bottom:4px;">Fixed (non-displayed) state variables:</div>';
+    for (const idx of indices) {
+      const name = stateVars[idx];
+      const [lo, hi] = lims[idx] || [-5, 5];
+      const val = clamped[idx] !== undefined ? clamped[idx] : (lo + hi) / 2;
+      html += `
+        <div class="ppw-param">
+          <label>${name}: <span class="ppw-clamped-value">${val.toFixed(3)}</span></label>
+          <input type="range" class="ppw-clamped-slider" data-var="${idx}"
+            min="${lo}" max="${hi}" step="${(hi - lo) / 500}" value="${val}">
+        </div>`;
+    }
+    clampedDiv.innerHTML = html;
+    clampedDiv.querySelectorAll(".ppw-clamped-slider").forEach((slider) => {
+      slider.addEventListener("input", () => {
+        const idx = parseInt(slider.dataset.var);
+        const val = parseFloat(slider.value);
+        slider.parentElement.querySelector(".ppw-clamped-value").textContent = val.toFixed(3);
+        const clamped = [...(model.get("clamped") || [])];
+        clamped[idx] = val;
+        model.set("clamped", clamped);
+        if (!isStandalone) model.save_changes();
+        computeAll();
+      });
+    });
   }
 
   // ── Limit / tmax inputs ──
@@ -688,7 +869,19 @@ export function render({ model, el }) {
       const params = model.get("params");
       const xlim = model.get("xlim");
       const ylim = model.get("ylim");
-      const result = runParameterSweep(modelName, param, params, min, max, n, xlim, ylim);
+      const def = MODELS[modelName];
+      const display = model.get("display") || def.display || [0, 1];
+      const stateVars = def.stateVars || def.stateNames || [];
+      const n = stateVars.length;
+      let clamped = model.get("clamped");
+      if (!clamped || clamped.length !== n) {
+        clamped = stateVars.map((_, i) => {
+          const lims = (def.defaultLims && def.defaultLims[i]) || [-1, 1];
+          return (lims[0] + lims[1]) / 2;
+        });
+      }
+      const fProj = makeProjectedRHS(modelName, display, clamped);
+      const result = runParameterSweep(fProj, modelName, param, params, min, max, n, xlim, ylim, display);
       model.set("sweep_results", result.results);
       model.set("sweep_fixed_points", result.allFps);
       model.set("sweep_param", param);
@@ -709,11 +902,20 @@ export function render({ model, el }) {
     const xlim = model.get("xlim");
     const ylim = model.get("ylim");
     const stateNames = model.get("state_names");
+    const def = MODELS[model.get("model_name")];
+    const display = model.get("display") || def.display || [0, 1];
+    const is1D = display.length === 1;
 
     phaseCtx.clearRect(0, 0, w, h);
     phaseCtx.fillStyle = "#fafafa";
     phaseCtx.fillRect(0, 0, w, h);
-    drawAxes(phaseCtx, w, h, xlim, ylim, stateNames[0], stateNames[1]);
+
+    if (is1D) {
+      // 1-D mode: draw dx/dt vs x
+      drawAxes(phaseCtx, w, h, xlim, [-2, 2], stateNames[display[0]], "d" + stateNames[display[0]] + "/dt");
+    } else {
+      drawAxes(phaseCtx, w, h, xlim, ylim, stateNames[display[0]], stateNames[display[1]]);
+    }
 
     // Nullclines
     if (model.get("show_nullclines")) {
@@ -772,10 +974,18 @@ export function render({ model, el }) {
       if (traj && traj.length > 1) {
         phaseCtx.strokeStyle = "#4CAF50"; phaseCtx.lineWidth = 1.5;
         phaseCtx.beginPath();
-        const [sx0, sy0] = worldToScreen(traj[0][1], traj[0][2], xlim, ylim, w, h);
+        const proj0 = [traj[0][display[0] + 1]];
+        if (!is1D) proj0.push(traj[0][display[1] + 1]);
+        const [sx0, sy0] = is1D
+          ? worldToScreen(proj0[0], 0, xlim, [-2, 2], w, h)
+          : worldToScreen(proj0[0], proj0[1], xlim, ylim, w, h);
         phaseCtx.moveTo(sx0, sy0);
         for (let i = 1; i < traj.length; i++) {
-          const [sx, sy] = worldToScreen(traj[i][1], traj[i][2], xlim, ylim, w, h);
+          const proj = [traj[i][display[0] + 1]];
+          if (!is1D) proj.push(traj[i][display[1] + 1]);
+          const [sx, sy] = is1D
+            ? worldToScreen(proj[0], 0, xlim, [-2, 2], w, h)
+            : worldToScreen(proj[0], proj[1], xlim, ylim, w, h);
           phaseCtx.lineTo(sx, sy);
         }
         phaseCtx.stroke();
@@ -952,6 +1162,17 @@ export function render({ model, el }) {
   populateModelSelector();
   createParamSliders(model.get("param_info"), model.get("params"));
   updateLimitInputs();
+
+  // Set up state selectors and clamped sliders for the initial model
+  const _initModelName = model.get("model_name");
+  const _initDef = MODELS[_initModelName];
+  const _initDisplay = model.get("display") || _initDef.display || [0, 1];
+  populateStateSelectors(_initDef, _initDisplay);
+  const _initClamped = model.get("clamped") || _initDef.stateVars.map((_, i) => {
+    const lims = (_initDef.defaultLims && _initDef.defaultLims[i]) || [-1, 1];
+    return (lims[0] + lims[1]) / 2;
+  });
+  createClampedSliders(_initDef, _initClamped, _initDisplay);
 
   // In standalone mode the model may already have data; otherwise compute it now
   const hasData = (model.get("trajectory") || []).length > 0;
