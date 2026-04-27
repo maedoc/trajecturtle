@@ -277,4 +277,89 @@ PLAN.md
 
 ---
 
-*Revised 2026-04-24 — incorporating DeepSeek v4 review*
+## Parallel Execution Strategy (Git Worktrees + Background Agents)
+
+After Phase A–C completion, the remaining development is **embarrassingly parallel** across three independent workstreams. Each touches **disjoint code regions** → clean merge with no conflicts.
+
+### Branch/Worktree Matrix
+
+```bash
+# Create branches
+git branch p1-1d-mode          # 1D line-plot phase plane
+git branch p2-heun-noise       # Stochastic Heun integrator
+git branch p3-safety-guards     # NaN/Inf budget guards
+
+# Create worktrees
+git worktree add ../trajecturtle-1d p1-1d-mode
+git worktree add ../trajecturtle-heun p2-heun-noise
+git worktree add ../trajecturtle-safe p3-safety-guards
+```
+
+| Worktree | Branch | Scope | Files Modified | Lines |
+|----------|--------|-------|----------------|-------|
+| `../trajecturtle-1d` | `p1-1d-mode` | 1D mode (dx/dt vs x) | `widget.js`: `renderPhasePlane`, `computeNullclines`, `computeVectorField`, CSS | ~+80 |
+| `../trajecturtle-heun` | `p2-heun-noise` | Stochastic Heun + noise UI | `widget.js`: `heun()`, noise sliders, deterministic nullclines | ~+120 |
+| `../trajecturtle-safe` | `p3-safety-guards` | Safety wrappers | `widget.js`: wrap all numerical entry points, add budget/NaN guards | ~+60 |
+
+### Independence Proof
+
+- **P1 (1D)** — only touches **rendering** code; doesn't change integration or numerical APIs
+- **P2 (Heun)** — adds new integrator + UI toggles; doesn't change existing RK4 or rendering
+- **P3 (Safety)** — wraps entry points with transparent guards; doesn't change algorithm internals
+
+### Launch Commands (Background Agents)
+
+```bash
+# P1: 1D mode
+cd ../trajecturtle-1d
+pi -p "Implement 1D line-plot phase plane mode in widget.js. 
+When display.length===1, renderPhasePlane draws dx/dt vs x (xlim horizontal, derivative vertical [-2,2]). 
+computeNullclines returns zero-crossings of f(x). computeVectorField draws arrows on x-axis. 
+Remove limit-cycle detection from detectRegime when is1D. Update CSS. 
+Test with Wilson-Cowan display=[0]." --no-sandbox --model ollama/deepseek-v4-flash
+
+# P2: Heun noise
+cd ../trajecturtle-heun
+pi -p "Implement stochastic Heun in widget.js. Add heun() with per-variable noise noise_shape=[nvar]. 
+Add noise_enable checkbox + per-var noise strength sliders. Nullclines/vector field use deterministic RHS. 
+Heun for trajectories when noise enabled, RK4 when disabled. Stratonovich. 
+Add sigma=0 test: Heun trajectory matches RK4 at low tolerance (not exact equality)." --no-sandbox --model ollama/deepseek-v4-flash
+
+# P3: Safety guards
+cd ../trajecturtle-safe
+pi -p "Add numerical safety to widget.js: (1) safeRK4/Heun with NaN/Inf short-circuit, 
+(2) computation budget max 50000 steps, (3) exp clamp to [-709,709], 
+(4) budget guards on findFixedPoints (max 625 Newton steps), computeNullclines (max 3600 evals), 
+computeVectorField (max 144 evals). Return empty on failure with console warning, never crash. 
+Test with MPR unstable regime where NaN could occur." --no-sandbox --model ollama/deepseek-v4-flash
+```
+
+### Merge Order
+
+```bash
+git merge p3-safety-guards   # safety first (transparent wrappers)
+git merge p2-heun-noise     # then Heun (needs stable base)
+git merge p1-1d-mode        # then 1D (render only, no deps)
+```
+
+### Cleanup
+
+```bash
+git worktree remove ../trajecturtle-1d
+git worktree remove ../trajecturtle-heun
+git worktree remove ../trajecturtle-safe
+git branch -d p1-1d-mode p2-heun-noise p3-safety-guards
+```
+
+### Estimated Effort
+
+| Stream | Wall Clock | Agent Work |
+|--------|-----------|------------|
+| P1 1D | ~20 min | ~15 min |
+| P2 Heun | ~35 min | ~25 min |
+| P3 Safety | ~20 min | ~15 min |
+| **Parallel** | **~35 min total** | **~55 min agent CPU** |
+
+---
+
+*Appended 2026-04-24*
