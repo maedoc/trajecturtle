@@ -12848,17 +12848,14 @@ function linspace(a, b, n) {
  *  @param {number[]} clamped — full N-dim state vector with clamped values
  *  @returns {Function} f_proj(t, projState, params) → derivatives of displayed vars
  */
-function makeProjectedRHS(modelName, displayIdx, clamped) {
+function makeProjectedRHS(modelName, displayIdx, clamped, spec = null) {
   // Use compiled projected RHS for custom models
-  if (modelName === 'custom') {
-    const spec = model.get('model_spec');
-    if (spec && spec.equations && Object.keys(spec.equations).length > 0) {
-      try {
-        const entry = compileModelSpec(spec);
-        return makeCompiledProjectedRHS(entry, displayIdx, clamped);
-      } catch (e) {
-        console.warn('Custom model compilation failed, falling back', e);
-      }
+  if (modelName === 'custom' && spec) {
+    try {
+      const entry = compileModelSpec(spec);
+      return makeCompiledProjectedRHS(entry, displayIdx, clamped);
+    } catch (e) {
+      console.warn('Custom model compilation failed, falling back', e);
     }
   }
 
@@ -13593,7 +13590,8 @@ export function render({ model, el }) {
     }
 
     // Projected RHS for phase-plane computations
-    const fProj = makeProjectedRHS(modelName, display, clamped);
+    const _spec4proj = modelName === 'custom' ? model.get('model_spec') : null;
+    const fProj = makeProjectedRHS(modelName, display, clamped, _spec4proj);
 
     // Nullclines (projected 2-D slice)
     const [ncX, ncY] = computeNullclines(fProj, params, xlim, ylim, 60);
@@ -13950,7 +13948,8 @@ export function render({ model, el }) {
         return (lims[0] + lims[1]) / 2;
       });
     }
-    const fProj = makeProjectedRHS(modelName, display, clamped);
+    const _sweepSpec = modelName === 'custom' ? model.get('model_spec') : null;
+    const fProj = makeProjectedRHS(modelName, display, clamped, _sweepSpec);
     const sweepModelArg = (modelName === 'custom' && def && def.f) ? def : modelName;
 
     const values = linspace(min, max, nSweep);
