@@ -200,9 +200,9 @@ def _handle_mul(expr, symbol_map):
         # Handle the numeric coefficient
         if num_coeff != 1.0:
             num_str = f'{_format_number(num_coeff)} * {num_str}' if num_str != '1' else _format_number(num_coeff)
-        # If the overall coefficient is negative, prepend minus
-        if num_coeff < 0:
-            result = f'-({num_str}) / ({den_str})' if num_str.startswith('-') else f'-{num_str} / ({den_str})'
+        # Parenthesise the whole numerator if it's a sum/difference
+        if num_coeff < 0 and (' + ' in num_str or ' - ' in num_str):
+            result = f'({num_str}) / ({den_str})'
         else:
             result = f'{num_str} / ({den_str})'
         return result
