@@ -13432,7 +13432,34 @@ export function render({ model, el }) {
           <label><input type="checkbox" class="ppw-show-vf" checked> Vector Field</label>
           <label><input type="checkbox" class="ppw-show-traj" checked> Trajectory</label>
           <label><input type="checkbox" class="ppw-show-fp" checked> Fixed Points</label>
+          <button class="ppw-editor-toggle">✏️ Custom Model</button>
         </div>
+      </div>
+      <div class="ppw-editor-panel">
+        <div class="ppw-editor-section">
+          <div class="ppw-editor-section-title">State Variables</div>
+          <table class="ppw-editor-table ppw-editor-state-table">
+            <thead><tr><th>Name</th><th>Min</th><th>Max</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="ppw-editor-section">
+          <div class="ppw-editor-section-title">Parameters</div>
+          <table class="ppw-editor-table ppw-editor-param-table">
+            <thead><tr><th>Name</th><th>Default</th><th>Min</th><th>Max</th><th>Step</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="ppw-editor-section">
+          <div class="ppw-editor-section-title">Equations</div>
+          <div class="ppw-editor-equations"></div>
+        </div>
+        <div class="ppw-editor-actions">
+          <button class="ppw-btn-apply ppw-editor-apply">Apply</button>
+          <button class="ppw-btn-copy ppw-editor-copy">Copy Spec</button>
+        </div>
+        <div class="ppw-editor-error"></div>
+        <div class="ppw-editor-status"></div>
       </div>
       <div class="ppw-plots">
         <div class="ppw-phase-container">
@@ -13498,6 +13525,15 @@ export function render({ model, el }) {
   const showVf = el.querySelector(".ppw-show-vf");
   const showTraj = el.querySelector(".ppw-show-traj");
   const showFp = el.querySelector(".ppw-show-fp");
+  const editorToggle = el.querySelector(".ppw-editor-toggle");
+  const editorPanel = el.querySelector(".ppw-editor-panel");
+  const editorStateTable = editorPanel.querySelector(".ppw-editor-state-table tbody");
+  const editorParamTable = editorPanel.querySelector(".ppw-editor-param-table tbody");
+  const editorEquationsDiv = editorPanel.querySelector(".ppw-editor-equations");
+  const editorApplyBtn = editorPanel.querySelector(".ppw-editor-apply");
+  const editorCopyBtn = editorPanel.querySelector(".ppw-editor-copy");
+  const editorError = editorPanel.querySelector(".ppw-editor-error");
+  const editorStatus = editorPanel.querySelector(".ppw-editor-status");
   const noiseEnable = el.querySelector(".ppw-noise-enable");
   const noiseSlidersDiv = el.querySelector(".ppw-noise-sliders");
   const integratorSelect = el.querySelector(".ppw-integrator-select");
@@ -14179,6 +14215,171 @@ export function render({ model, el }) {
       }
     }
   }
+
+  // ═════════════════════════════════════════════════════════════
+  //  LIVE EDITOR
+  // ═════════════════════════════════════════════════════════════
+
+  let _editorOpen = false;
+
+  function toggleEditor() {
+    _editorOpen = !_editorOpen;
+    editorPanel.classList.toggle("open", _editorOpen);
+    if (_editorOpen) populateEditor();
+  }
+
+  function populateEditor() {
+    const modelName = model.get("model_name");
+    let spec;
+    if (modelName === "custom" && model.get("model_spec")) {
+      spec = model.get("model_spec");
+    } else {
+      const def = MODELS[modelName] || MODELS.wilson_cowan;
+      const stateNames = def.stateNames || [];
+      const paramKeys = Object.keys(def.defaultParams || {});
+      const paramInfo = def.paramInfo || {};
+      const defaultLims = def.defaultLims || stateNames.map(() => [-1, 1]);
+      spec = {
+        name: modelName,
+        state_vars: {},
+        parameters: {},
+        equations: {},
+        display: def.display || [0, 1],
+      };
+      stateNames.forEach((name, i) => {
+        const [lo, hi] = defaultLims[i] || [-1, 1];
+        spec.state_vars[name] = { default: (lo + hi) / 2, range: [lo, hi] };
+      });
+      paramKeys.forEach((k) => {
+        const [lo, hi, defVal] = paramInfo[k] || [-1, 1, 0];
+        spec.parameters[k] = { default: defVal, range: [lo, hi], step: (hi - lo) / 500 };
+      });
+      stateNames.forEach((name) => {
+        spec.equations[name] = "/* built-in model — equations not editable */";
+      });
+    }
+
+    let svHtml = "";
+    for (const [name, info] of Object.entries(spec.state_vars || {})) {
+      const [lo, hi] = info.range || [-1, 1];
+      svHtml += `<tr data-name="${name}"><td>${name}</td><td><input type="number" class="ppw-ed-svmin" value="${lo}"></td><td><input type="number" class="ppw-ed-svmax" value="${hi}"></td></tr>`;
+    }
+    editorStateTable.innerHTML = svHtml;
+
+    let pHtml = "";
+    for (const [name, info] of Object.entries(spec.parameters || {})) {
+      const [lo, hi] = info.range || [-1, 1];
+      const step = info.step || (hi - lo) / 500;
+      pHtml += `<tr data-name="${name}"><td>${name}</td><td><input type="number" class="ppw-ed-pdef" value="${info.default}"></td><td><input type="number" class="ppw-ed-pmin" value="${lo}"></td><td><input type="number" class="ppw-ed-pmax" value="${hi}"></td><td><input type="number" class="ppw-ed-pstep" value="${step}"></td></tr>`;
+    }
+    editorParamTable.innerHTML = pHtml;
+
+    let eqHtml = "";
+    for (const [name, expr] of Object.entries(spec.equations || {})) {
+      const readonly = expr.startsWith("/*") ? "readonly" : "";
+      eqHtml += `<div class="ppw-editor-equation" data-name="${name}"><label>d${name}/dt =</label><textarea class="ppw-ed-expr" ${readonly}>${expr}</textarea></div>`;
+    }
+    editorEquationsDiv.innerHTML = eqHtml;
+  }
+
+  function buildModelSpec() {
+    const state_vars = {};
+    editorStateTable.querySelectorAll("tr").forEach((tr) => {
+      const name = tr.dataset.name;
+      const lo = parseFloat(tr.querySelector(".ppw-ed-svmin").value);
+      const hi = parseFloat(tr.querySelector(".ppw-ed-svmax").value);
+      state_vars[name] = { default: (lo + hi) / 2, range: [lo, hi] };
+    });
+
+    const parameters = {};
+    editorParamTable.querySelectorAll("tr").forEach((tr) => {
+      const name = tr.dataset.name;
+      const defVal = parseFloat(tr.querySelector(".ppw-ed-pdef").value);
+      const lo = parseFloat(tr.querySelector(".ppw-ed-pmin").value);
+      const hi = parseFloat(tr.querySelector(".ppw-ed-pmax").value);
+      const step = parseFloat(tr.querySelector(".ppw-ed-pstep").value);
+      parameters[name] = { default: defVal, range: [lo, hi], step };
+    });
+
+    const equations = {};
+    editorEquationsDiv.querySelectorAll(".ppw-editor-equation").forEach((div) => {
+      const name = div.dataset.name;
+      const expr = div.querySelector(".ppw-ed-expr").value.trim();
+      if (!expr.startsWith("/*")) equations[name] = expr;
+    });
+
+    const stateNamesList = Object.keys(state_vars);
+    return {
+      name: "custom",
+      state_vars,
+      parameters,
+      equations,
+      display: [0, stateNamesList.length > 1 ? 1 : 0],
+      integrator: model.get("integrator") || "rk4",
+      noise_per_var: model.get("noise_sigma") || null,
+    };
+  }
+
+  function validateSpec(spec) {
+    const errors = [];
+    for (const [name, exprStr] of Object.entries(spec.equations)) {
+      try {
+        nerdamer(exprStr);
+      } catch (e) {
+        errors.push(`Equation '${name}': ${e.message || "parse error"}`);
+      }
+    }
+    return errors;
+  }
+
+  function applyEditor() {
+    editorError.classList.remove("visible");
+    editorError.textContent = "";
+    editorStatus.textContent = "Validating...";
+
+    const spec = buildModelSpec();
+    const errors = validateSpec(spec);
+    if (errors.length > 0) {
+      editorError.textContent = errors.join("\n");
+      editorError.classList.add("visible");
+      editorStatus.textContent = "Validation failed";
+      return;
+    }
+
+    try {
+      const entry = compileModelSpec(spec);
+      if (!entry || !entry.f) {
+        throw new Error("Compilation produced no executable function");
+      }
+    } catch (e) {
+      editorError.textContent = `Compilation error: ${e.message || e}`;
+      editorError.classList.add("visible");
+      editorStatus.textContent = "Compilation failed";
+      return;
+    }
+
+    model.set("model_spec", spec);
+    model.set("model_name", "custom");
+    if (!isStandalone) model.save_changes();
+    editorStatus.textContent = "Applied — switching to custom model";
+    computeAll();
+  }
+
+  function copySpec() {
+    const spec = buildModelSpec();
+    const json = JSON.stringify(spec, null, 2);
+    navigator.clipboard.writeText(json).then(() => {
+      editorStatus.textContent = "Spec copied to clipboard!";
+      setTimeout(() => { editorStatus.textContent = ""; }, 2000);
+    }).catch(() => {
+      editorStatus.textContent = "Failed to copy — see browser console";
+      console.log(json);
+    });
+  }
+
+  editorToggle.addEventListener("click", toggleEditor);
+  editorApplyBtn.addEventListener("click", applyEditor);
+  editorCopyBtn.addEventListener("click", copySpec);
 
   // ═════════════════════════════════════════════════════════════
   //  INITIALISATION

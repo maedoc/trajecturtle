@@ -362,3 +362,160 @@
     height: 3px;
     border-radius: 1px;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   LIVE EDITOR
+   ═══════════════════════════════════════════════════════════════ */
+
+.ppw-editor-toggle {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: #2196F3;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.ppw-editor-toggle:hover {
+    background: #1976D2;
+}
+
+.ppw-editor-panel {
+    display: none;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.ppw-editor-panel.open {
+    display: block;
+}
+
+.ppw-editor-section {
+    margin-bottom: 12px;
+}
+
+.ppw-editor-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #495057;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ppw-editor-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.ppw-editor-table th {
+    text-align: left;
+    padding: 4px 6px;
+    background: #e9ecef;
+    color: #495057;
+    font-weight: 600;
+}
+
+.ppw-editor-table td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.ppw-editor-table input {
+    width: 80px;
+    padding: 3px 6px;
+    font-size: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+}
+
+.ppw-editor-equation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.ppw-editor-equation label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #495057;
+    min-width: 24px;
+}
+
+.ppw-editor-equation textarea {
+    flex: 1;
+    height: 28px;
+    padding: 4px 8px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    font-size: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    resize: vertical;
+}
+
+.ppw-editor-equation textarea.ppw-error {
+    border-color: #f44336;
+    background: #ffebee;
+}
+
+.ppw-editor-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.ppw-editor-actions button {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.ppw-btn-apply {
+    color: #fff;
+    background: #4CAF50;
+}
+
+.ppw-btn-apply:hover {
+    background: #388E3C;
+}
+
+.ppw-btn-copy {
+    color: #495057;
+    background: #e9ecef;
+}
+
+.ppw-btn-copy:hover {
+    background: #dee2e6;
+}
+
+.ppw-editor-error {
+    margin-top: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #c62828;
+    background: #ffebee;
+    border: 1px solid #ef9a9a;
+    border-radius: 4px;
+    display: none;
+}
+
+.ppw-editor-error.visible {
+    display: block;
+}
+
+.ppw-editor-status {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #6c757d;
+    font-style: italic;
+}
