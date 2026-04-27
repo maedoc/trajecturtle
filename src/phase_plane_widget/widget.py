@@ -61,6 +61,11 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     show_trajectory = traitlets.Bool(True).tag(sync=True)
     show_fixed_points = traitlets.Bool(True).tag(sync=True)
 
+    # Integrator / noise
+    integrator = traitlets.Unicode("rk4").tag(sync=True)
+    noise_enable = traitlets.Bool(False).tag(sync=True)
+    noise_sigma = traitlets.List([]).tag(sync=True)
+
     # Custom model specification (JSON-serialisable dict for JS)
     model_spec = traitlets.Dict(allow_none=True, default_value=None).tag(sync=True)
 
@@ -191,6 +196,9 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "model_spec": self.model_spec,
             "display": [0, 1],
             "clamped": None,
+            "integrator": self.integrator,
+            "noise_enable": self.noise_enable,
+            "noise_sigma": self.noise_sigma,
             "show_nullclines": self.show_nullclines,
             "show_vector_field": self.show_vector_field,
             "show_trajectory": self.show_trajectory,

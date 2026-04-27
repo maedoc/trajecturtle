@@ -163,6 +163,62 @@ function rk4(modelName, y0, t0, tf, h, params) {
   return results;
 }
 
+/** Box-Muller transform for standard normal random numbers. */
+function randn() {
+  let u1 = Math.random();
+  let u2 = Math.random();
+  while (u1 === 0) u1 = Math.random();
+  while (u2 === 0) u2 = Math.random();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+/** Fixed-step Stratonovich Heun integrator with additive noise.
+ *  noiseSigma is an array of per-variable noise strengths (same length as state).
+ *  Returns array of [t, v0, v1, ...] rows.
+ *  Max 50,000 step budget.  */
+function heun(modelName, y0, t0, tf, h, params, noiseSigma) {
+  const f = MODELS[modelName].f;
+  const dim = y0.length;
+  const results = [[t0, ...y0]];
+  let t = t0;
+  let y = [...y0];
+  let steps = 0;
+  const maxSteps = 50000;
+  while (t < tf - 1e-12 && steps < maxSteps) {
+    const dt = Math.min(h, tf - t);
+    const sqrtDt = Math.sqrt(dt);
+    // Wiener increments: dW ~ Normal(0, sqrt(dt))
+    const dW = new Array(dim);
+    for (let i = 0; i < dim; i++) {
+      dW[i] = sqrtDt * randn();
+    }
+    // Predictor: Ytilde = Yn + f(Yn)*dt + sigma*dW
+    const fn = f(t, y, params);
+    const yTilde = y.map((yi, i) => yi + fn[i] * dt + (noiseSigma[i] || 0) * dW[i]);
+    // Corrector: Yn+1 = Yn + 0.5*(f(Yn)+f(Ytilde))*dt + sigma*dW
+    const fTilde = f(t + dt, yTilde, params);
+    y = y.map((yi, i) => yi + 0.5 * (fn[i] + fTilde[i]) * dt + (noiseSigma[i] || 0) * dW[i]);
+    t += dt;
+    steps++;
+    // Check for NaN / blow-up and abort gracefully
+    if (y.some((v) => !isFinite(v))) break;
+    results.push([t, ...y]);
+  }
+  return results;
+}
+
+/** Dispatch to the appropriate integrator based on settings.
+ *  settings = { integrator: 'rk4'|'heun', noiseSigma: [...]|null }
+ */
+function simulate(modelName, state0, t0, tf, dt, params, settings) {
+  const integrator = (settings && settings.integrator) || 'rk4';
+  if (integrator === 'heun') {
+    const noiseSigma = (settings && settings.noiseSigma) || state0.map(() => 0);
+    return heun(modelName, state0, t0, tf, dt, params, noiseSigma);
+  }
+  return rk4(modelName, state0, t0, tf, dt, params);
+}
+
 /** Numerical Jacobian (works for 1-D or 2-D projected systems). */
 function jacobianND(f, state, params, eps = 1e-6) {
   const dim = state.length;
@@ -488,6 +544,18 @@ export function render({ model, el }) {
             <input class="ppw-tmax" type="number" step="10" min="1">
           </label>
         </div>
+        <div class="ppw-noise-section">
+          <div class="ppw-control-row">
+            <label><input type="checkbox" class="ppw-noise-enable"> Enable noise</label>
+            <label>Integrator:
+              <select class="ppw-integrator-select">
+                <option value="rk4">RK4</option>
+                <option value="heun">Heun</option>
+              </select>
+            </label>
+          </div>
+          <div class="ppw-noise-sliders"></div>
+        </div>
         <div class="ppw-control-row ppw-toggles">
           <label><input type="checkbox" class="ppw-show-null" checked> Nullclines</label>
           <label><input type="checkbox" class="ppw-show-vf" checked> Vector Field</label>
@@ -559,6 +627,9 @@ export function render({ model, el }) {
   const showVf = el.querySelector(".ppw-show-vf");
   const showTraj = el.querySelector(".ppw-show-traj");
   const showFp = el.querySelector(".ppw-show-fp");
+  const noiseEnable = el.querySelector(".ppw-noise-enable");
+  const noiseSlidersDiv = el.querySelector(".ppw-noise-sliders");
+  const integratorSelect = el.querySelector(".ppw-integrator-select");
 
   const phaseCtx = phaseCanvas.getContext("2d");
   const timeCtx = timeCanvas.getContext("2d");
@@ -619,7 +690,11 @@ export function render({ model, el }) {
     const fullState0 = [...clamped];
     fullState0[display[0]] = x0;
     if (display.length > 1) fullState0[display[1]] = y0;
-    const traj = rk4(modelName, fullState0, 0, tMax, 0.01, params);
+    const integrator = model.get('integrator') || 'rk4';
+    const noiseSigma = (integrator === 'heun' && model.get('noise_enable'))
+                       ? model.get('noise_sigma') : null;
+    const settings = { integrator, noiseSigma };
+    const traj = simulate(modelName, fullState0, 0, tMax, 0.01, params, settings);
     const step = Math.max(1, Math.floor(traj.length / 2000));
     const trajDisplay = traj.filter((_, i) => i % step === 0);
     model.set("trajectory", trajDisplay);
@@ -676,6 +751,9 @@ export function render({ model, el }) {
     updateLimitInputs();
     populateStateSelectors(def, display);
     createClampedSliders(def, clamped, display);
+    integratorSelect.value = model.get('integrator') || 'rk4';
+    noiseEnable.checked = model.get('noise_enable') || false;
+    createNoiseSliders();
     computeAll();
   });
 
@@ -824,6 +902,58 @@ export function render({ model, el }) {
     computeAll();
   }
   [xMinIn, xMaxIn, yMinIn, yMaxIn, tMaxIn].forEach((inp) => inp.addEventListener("change", sendLimits));
+
+  // ── Noise controls ──
+  function createNoiseSliders() {
+    const dim = (MODELS[model.get("model_name")] || {}).dim || 0;
+    const stateNames = model.get("state_names") || [];
+    if (dim <= 0 || !noiseEnable.checked) {
+      noiseSlidersDiv.style.display = "none";
+      return;
+    }
+    noiseSlidersDiv.style.display = "block";
+    // Get current noise sigma values, defaulting to zeros
+    let sigma = model.get("noise_sigma");
+    if (!sigma || sigma.length !== dim) {
+      sigma = new Array(dim).fill(0);
+      model.set("noise_sigma", sigma);
+    }
+    let html = '<div style="font-size:11px;color:#666;margin-bottom:4px;">Noise strengths:</div>';
+    for (let i = 0; i < dim; i++) {
+      const name = stateNames[i] || ("x" + i);
+      const val = sigma[i] !== undefined ? sigma[i] : 0;
+      html += `
+        <div class="ppw-param">
+          <label>${name}: <span class="ppw-noise-value-${i}">${val.toFixed(3)}</span></label>
+          <input type="range" class="ppw-noise-slider" data-idx="${i}"
+            min="0" max="1" step="0.01" value="${val}">
+        </div>`;
+    }
+    noiseSlidersDiv.innerHTML = html;
+    noiseSlidersDiv.querySelectorAll(".ppw-noise-slider").forEach((slider) => {
+      slider.addEventListener("input", () => {
+        const idx = parseInt(slider.dataset.idx);
+        const val = parseFloat(slider.value);
+        const span = noiseSlidersDiv.querySelector(".ppw-noise-value-" + idx);
+        if (span) span.textContent = val.toFixed(3);
+        const sigma = [...(model.get("noise_sigma") || new Array(dim).fill(0))];
+        sigma[idx] = val;
+        model.set("noise_sigma", sigma);
+        if (!isStandalone) model.save_changes();
+      });
+    });
+  }
+
+  noiseEnable.addEventListener("change", () => {
+    model.set("noise_enable", noiseEnable.checked);
+    if (!isStandalone) model.save_changes();
+    createNoiseSliders();
+  });
+
+  integratorSelect.addEventListener("change", () => {
+    model.set("integrator", integratorSelect.value);
+    if (!isStandalone) model.save_changes();
+  });
 
   // ── Toggles ──
   [showNull, showVf, showTraj, showFp].forEach((cb) => {
@@ -1173,6 +1303,9 @@ export function render({ model, el }) {
     return (lims[0] + lims[1]) / 2;
   });
   createClampedSliders(_initDef, _initClamped, _initDisplay);
+  integratorSelect.value = model.get('integrator') || 'rk4';
+  noiseEnable.checked = model.get('noise_enable') || false;
+  createNoiseSliders();
 
   // In standalone mode the model may already have data; otherwise compute it now
   const hasData = (model.get("trajectory") || []).length > 0;
