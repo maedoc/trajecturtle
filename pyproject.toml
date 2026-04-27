@@ -30,3 +30,8 @@ docs = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/phase_plane_widget"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]

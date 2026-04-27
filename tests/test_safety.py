@@ -25,6 +25,7 @@ def _get_js_source():
 
 def _run_node_script(js_code: str) -> dict:
     """Evaluate JS code in Node.js and return the JSON result."""
+    js_code = "if (typeof window === 'undefined') globalThis.window = globalThis;\n" + js_code
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".js", delete=False
     ) as f:

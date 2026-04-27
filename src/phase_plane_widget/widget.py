@@ -214,7 +214,6 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "sweep_param": "",
             "sweep_running": False,
             "model_spec": self.model_spec,
-<<<<<<< HEAD
             "display": list(self.display) if self.display else [0, 1],
             "clamped": list(self.clamped) if self.clamped else None,
             "integrator": self.integrator,

@@ -9,6 +9,7 @@ These tests verify the Python-to-JS pipeline for custom ODE models:
 import json
 
 import numpy as np
+import sympy as sp
 
 from phase_plane_widget import ModelSpec, PhasePlaneWidget, phase_plane
 
@@ -35,7 +36,8 @@ def test_custom_linear_2d_model_spec():
     assert "x" in state["equations"]
     assert "y" in state["equations"]
     assert state["equations"]["x"] == "a*x - y"
-    assert state["equations"]["y"] == "x - b*y"
+    # SymPy may reorder the terms; check numerical equivalence instead of exact string
+    assert sp.sympify(state["equations"]["y"]).equals(sp.sympify("x - b*y"))
     assert state["parameters"]["a"]["default"] == 1.0
     assert state["parameters"]["a"]["range"] == [0.0, 2.0]
     assert state["parameters"]["b"]["default"] == 1.0
@@ -151,7 +153,7 @@ def test_custom_model_with_custom_functions():
         equations=["f(x) + y", "x - b*y"],
         state_vars={"x": (-3, 3), "y": (-3, 3)},
         params={"b": (1.0, 0, 2)},
-        custom_functions={"f": "x^2"},
+        custom_functions={"f": "x**2"},
     )
 
     state = spec.to_widget_state()
