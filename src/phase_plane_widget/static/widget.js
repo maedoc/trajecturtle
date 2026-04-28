@@ -12623,6 +12623,33 @@ const MODELS = {
       return [dr, dv];
     },
   },
+
+  hindmarsh_rose: {
+    dim: 3,
+    stateNames: ["x", "y", "z"],
+    stateVars: ["x", "y", "z"],
+    display: [0, 1],
+    defaultParams: { a: 1.0, b: 3.0, c: 1.0, d: 5.0, I: 3.0, r: 0.001, s: 4.0, x_r: -1.6 },
+    paramInfo: {
+      a: [0.5, 2.0, 1.0, "Cubic coefficient a"],
+      b: [1.0, 5.0, 3.0, "Quadratic coefficient b"],
+      c: [0.0, 2.0, 1.0, "Constant drive c"],
+      d: [1.0, 10.0, 5.0, "Quadratic loss d"],
+      I: [-2.0, 6.0, 3.0, "Applied current I"],
+      r: [0.0001, 0.01, 0.001, "Slow time scale r"],
+      s: [1.0, 8.0, 4.0, "Slow gain s"],
+      x_r: [-3.0, 0.0, -1.6, "Resting offset x_r"],
+    },
+    defaultXlim: [-3.0, 3.0],
+    defaultYlim: [-20.0, 10.0],
+    defaultLims: [[-3.0, 3.0], [-20.0, 10.0], [-1.0, 3.5]],
+    f: (_t, [x, y, z], p) => {
+      const dx = y - p.a * x * x * x + p.b * x * x - z + p.I;
+      const dy = p.c - p.d * x * x - y;
+      const dz = p.r * (p.s * (x - p.x_r) - z);
+      return [dx, dy, dz];
+    },
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -13553,8 +13580,8 @@ export function render({ model, el }) {
   const stateSelectorRow = el.querySelector(".ppw-state-selector");
   const clampedDiv = el.querySelector(".ppw-clamped-sliders");
 
-  const MODEL_NAMES = ["wilson_cowan", "fitzhugh_nagumo", "mpr", "custom"];
-  const MODEL_LABELS = { wilson_cowan: "Wilson-Cowan", fitzhugh_nagumo: "FitzHugh-Nagumo", mpr: "MPR (QIF)", custom: "Custom" };
+  const MODEL_NAMES = ["wilson_cowan", "fitzhugh_nagumo", "mpr", "hindmarsh_rose", "custom"];
+  const MODEL_LABELS = { wilson_cowan: "Wilson-Cowan", fitzhugh_nagumo: "FitzHugh-Nagumo", mpr: "MPR (QIF)", hindmarsh_rose: "Hindmarsh–Rose", custom: "Custom" };
   // Custom model is resolved dynamically via compileModelSpec
 
   // ═════════════════════════════════════════════════════════════

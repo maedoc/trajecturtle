@@ -38,6 +38,20 @@ Just beyond the bistable region, the MPR model exhibits **limit cycle oscillatio
 
 ---
 
+## Hindmarsh–Rose: 3D Bursting Neuron
+
+A three-variable phenomenological model of neuronal bursting.  The fast
+subsystem (x, y) generates action potentials while the slow adaptation
+current z modulates the burst period.  With the default parameters
+(a=1, b=3, c=1, d=5, I=3, r=0.001, s=4, x_r=-1.6) the model produces
+rich **square-wave bursting** — trains of spikes followed by silent
+quiescent phases.  Decrease *b* to cross the transition to plateau-like
+bursting, or increase *I* to enter tonic spiking.
+
+<iframe src="hindmarsh_rose.html" width="100%" height="1400" frameborder="0" style="border:1px solid #ddd; border-radius:8px;"></iframe>
+
+---
+
 ## Custom Model Editor
 
 This demo pre-loads the **MPR (QIF)** equations into the live editor so you can tweak them interactively.  Try adding extra terms (e.g. ``-r^3`` for firing-rate adaptation) or changing the noise strength.

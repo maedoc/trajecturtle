@@ -311,6 +311,62 @@ class WilsonCowan(BaseModel):
         ]
 
 
+class HindmarshRose(BaseModel):
+    """Hindmarsh–Rose model of neuronal bursting.
+
+    A three-variable phenomenological model producing spiking and bursting
+    oscillations.  The fast subsystem (x, y) drives action potentials, while
+    the slow adaptation current z modulates the burst period.
+
+    Equations
+    ---------
+    dx/dt = y – a·x³ + b·x² – z + I
+    dy/dt = c – d·x² – y
+    dz/dt = r·(s·(x – x_r) – z)
+
+    References
+    ----------
+    Hindmarsh J. L.; Rose R. M. (1984).
+    "A model of neuronal bursting using three coupled first order
+    differential equations". Proc. R. Soc. Lond. B 221, 87–102.
+    """
+
+    name = "hindmarsh_rose"
+    dim = 3
+    state_names = ["x", "y", "z"]
+    default_params = {
+        "a": 1.0,
+        "b": 3.0,
+        "c": 1.0,
+        "d": 5.0,
+        "I": 3.0,
+        "r": 0.001,
+        "s": 4.0,
+        "x_r": -1.6,
+    }
+    param_info = {
+        "a": (0.5, 2.0, 1.0, "Cubic coefficient a"),
+        "b": (1.0, 5.0, 3.0, "Quadratic coefficient b"),
+        "c": (0.0, 2.0, 1.0, "Constant drive c"),
+        "d": (1.0, 10.0, 5.0, "Quadratic loss d"),
+        "I": (-2.0, 6.0, 3.0, "Applied current I"),
+        "r": (0.0001, 0.01, 0.001, "Slow time scale r"),
+        "s": (1.0, 8.0, 4.0, "Slow gain s"),
+        "x_r": (-3.0, 0.0, -1.6, "Resting offset x_r"),
+    }
+    default_xlim = [-3.0, 3.0]
+    default_ylim = [-20.0, 10.0]
+
+    def f(self, t, state, params):
+        x, y, z = state
+        p = {**self.default_params, **params}
+        return [
+            y - p["a"] * x ** 3 + p["b"] * x ** 2 - z + p["I"],
+            p["c"] - p["d"] * x ** 2 - y,
+            p["r"] * (p["s"] * (x - p["x_r"]) - z),
+        ]
+
+
 class FitzHughNagumo(BaseModel):
     """FitzHugh-Nagumo model of excitable neuron dynamics."""
 
@@ -375,4 +431,5 @@ MODEL_REGISTRY = {
     "wilson_cowan": WilsonCowan,
     "fitzhugh_nagumo": FitzHughNagumo,
     "mpr": MPRModel,
+    "hindmarsh_rose": HindmarshRose,
 }
