@@ -14572,3 +14572,6 @@ export function render({ model, el }) {
     // cleanup if needed
   };
 }
+
+// Explicit default export for stricter module loaders (marimo)
+export default { render };
