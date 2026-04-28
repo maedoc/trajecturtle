@@ -75,6 +75,21 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     # Clamped values for non-displayed state variables
     clamped = traitlets.List(default_value=None, allow_none=True).tag(sync=True)
 
+    # Layout mode: "full" shows controls + phase plane + time series + sweep
+    # "phase_plane" shows only the phase plane canvas (useful in notebooks / iframes)
+    display_mode = traitlets.Unicode("full").tag(sync=True)
+
+    _DISPLAY_MODES = frozenset({"full", "phase_plane"})
+
+    @traitlets.validate("display_mode")
+    def _validate_display_mode(self, proposal):
+        v = proposal["value"]
+        if v not in self._DISPLAY_MODES:
+            raise traitlets.TraitError(
+                f"display_mode must be one of {self._DISPLAY_MODES}, got {v!r}"
+            )
+        return v
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._update_model()
@@ -224,6 +239,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "integrator": self.integrator,
             "noise_enable": self.noise_enable,
             "noise_sigma": self.noise_sigma,
+            "display_mode": self.display_mode,
         }
 
         extra_js = f"\n{on_render_js}\n" if on_render_js else ""

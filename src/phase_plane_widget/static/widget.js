@@ -13381,9 +13381,11 @@ export function render({ model, el }) {
   // Detect standalone mode (no real anywidget kernel behind the model)
   const isStandalone = model._isMock === true || typeof model.save_changes !== "function";
 
+  const displayMode = model.get("display_mode") || "full";
+
   // ── Create DOM ──
   el.innerHTML = `
-    <div class="ppw-widget">
+    <div class="ppw-widget${displayMode === 'phase_plane' ? ' ppw-phase-only' : ''}">
       <div class="ppw-controls">
         <div class="ppw-control-row">
           <label class="ppw-label">Model:
@@ -14112,6 +14114,7 @@ export function render({ model, el }) {
   }
 
   function renderTimeSeries() {
+    if (displayMode === "phase_plane") return;
     const w = timeCanvas.width, h = timeCanvas.height;
     const traj = model.get("trajectory");
     const stateNames = model.get("state_names");
@@ -14193,6 +14196,7 @@ export function render({ model, el }) {
   }
 
   function renderSweep() {
+    if (displayMode === "phase_plane") return;
     const results = model.get("sweep_results");
     const fps = model.get("sweep_fixed_points");
     _renderSweepData(results, fps, model.get("sweep_param"));

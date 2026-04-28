@@ -550,3 +550,32 @@
     color: #6c757d;
     font-style: italic;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   DISPLAY MODE: phase_plane only
+   ═══════════════════════════════════════════════════════════════ */
+
+.ppw-widget.ppw-phase-only .ppw-controls,
+.ppw-widget.ppw-phase-only .ppw-time-container,
+.ppw-widget.ppw-phase-only .ppw-sweep,
+.ppw-widget.ppw-phase-only .ppw-editor-panel,
+.ppw-widget.ppw-phase-only .ppw-noise-section {
+    display: none;
+}
+
+.ppw-widget.ppw-phase-only .ppw-plots {
+    flex-direction: column;
+}
+
+.ppw-widget.ppw-phase-only .ppw-phase-container {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+}
+
+.ppw-widget.ppw-phase-only .ppw-phase-canvas {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    max-height: none;
+}

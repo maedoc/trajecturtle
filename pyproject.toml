@@ -13,6 +13,7 @@ dependencies = [
     "anywidget>=0.9.0",
     "ipywidgets>=8.0",
     "numpy",
+    "pydantic-ai>=0.8.1",
     "scipy",
     "sympy",
     "traitlets",
