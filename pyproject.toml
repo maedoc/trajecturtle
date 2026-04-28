@@ -33,5 +33,6 @@ packages = ["src/phase_plane_widget"]
 
 [dependency-groups]
 dev = [
+    "marimo>=0.17.6",
     "pytest>=8.4.2",
 ]
