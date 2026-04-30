@@ -90,13 +90,20 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             )
         return v
 
-    def __init__(self, **kwargs):
+    _model_instance = None
+
+    def __init__(self, model=None, **kwargs):
+        if model is not None:
+            self._model_instance = model
+            kwargs.setdefault("model_name", model.name)
         super().__init__(**kwargs)
         self._update_model()
 
     def _get_model(self):
         from .models import MODEL_REGISTRY
 
+        if self._model_instance is not None:
+            return self._model_instance
         cls = MODEL_REGISTRY.get(self.model_name, MODEL_REGISTRY["wilson_cowan"])
         return cls()
 

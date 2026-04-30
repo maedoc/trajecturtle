@@ -36,6 +36,42 @@ pp
 
 The SymPy expressions are transpiled to JavaScript via an inlined Nerdamer CAS (~100 KB) that compiles and runs entirely in the browser.
 
+### Passing a Model Instance {#model-instance}
+
+You can also instantiate a model class first, configure its defaults, and then pass it to the widget. This is useful when you want to programatically set initial parameter values or read back tuned values after the user interacts with the sliders.
+
+```python
+from tvb_phaseplane import PhasePlaneWidget, MPRModel
+
+# 1. Create a model instance
+model = MPRModel()
+
+# 2. Optionally override default parameter values
+model.default_params.update({"J": 15.0, "eta_bar": -5.0})
+
+# 3. Pass the instance to the widget
+widget = PhasePlaneWidget(model=model)
+widget
+```
+
+After the user adjusts sliders in the widget, read back the tuned parameter values:
+
+```python
+print("Current parameter values:")
+for name, value in widget.params.items():
+    print(f"  {name:12s} = {value:.4f}")
+```
+
+You can also read back computed data:
+
+```python
+print(f"Fixed points: {len(widget.fixed_points)}")
+for fp in widget.fixed_points:
+    print(f"  x={fp[0]:.4f}, y={fp[1]:.4f}, type={fp[2]}")
+```
+
+The ``model=`` argument accepts any ``BaseModel`` subclass whose ``name`` is registered in ``MODEL_REGISTRY`` (so the JavaScript front-end knows how to evaluate it). For arbitrary ODE systems that are *not* built in, use :func:`phase_plane` instead.
+
 ### Exporting Notebooks
 
 Use [jupytext](https://jupytext.readthedocs.io/) to keep notebooks in plain `.py` percent-format:

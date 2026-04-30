@@ -21,17 +21,22 @@ Interactive phase plane widget for neural mass models, usable in Jupyter noteboo
 ## Installation
 
 ```bash
+pip install tvb-phaseplane
+```
+
+For development with Jupyter:
+```bash
+pip install tvb-phaseplane[dev]
+```
+
+Or install from source:
+```bash
 # Using uv
 uv venv
 uv pip install -e .
 
 # Or using pip
 pip install -e .
-```
-
-For development with Jupyter:
-```bash
-uv pip install -e ".[dev]"
 ```
 
 ## Quick Start
