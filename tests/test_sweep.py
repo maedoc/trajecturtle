@@ -5,7 +5,7 @@ import os
 import subprocess
 import tempfile
 
-WIDGET_JS = (os.path.join(os.path.dirname(__file__), '..', 'src', 'phase_plane_widget', 'static', 'widget.js'))
+WIDGET_JS = (os.path.join(os.path.dirname(__file__), '..', 'src', 'tvb_phaseplane', 'static', 'widget.js'))
 
 
 def run_sweep_test_js(js_code: str):

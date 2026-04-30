@@ -78,4 +78,4 @@ nav:
   - Demos: demos/index.md
 
 watch:
-  - src/phase_plane_widget
+  - src/tvb_phaseplane

@@ -31,8 +31,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-from phase_plane_widget import PhasePlaneWidget
-from phase_plane_widget.models import MPRModel
+from tvb_phaseplane import PhasePlaneWidget
+from tvb_phaseplane.models import MPRModel
 
 plt.rcParams["figure.dpi"] = 120
 

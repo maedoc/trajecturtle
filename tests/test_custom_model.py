@@ -11,7 +11,7 @@ import json
 import numpy as np
 import sympy as sp
 
-from phase_plane_widget import ModelSpec, PhasePlaneWidget, phase_plane
+from tvb_phaseplane import ModelSpec, PhasePlaneWidget, phase_plane
 
 
 def test_custom_linear_2d_model_spec():

@@ -21,7 +21,7 @@
 # where $\mu > 0$ controls the strength of nonlinear damping.
 
 # %%
-from phase_plane_widget import phase_plane
+from tvb_phaseplane import phase_plane
 
 # mu = 1.0  → relaxation oscillator
 pp = phase_plane(

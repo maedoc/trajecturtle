@@ -7,8 +7,8 @@ import tempfile
 import pytest
 import traitlets
 
-import phase_plane_widget
-from phase_plane_widget import PhasePlaneWidget
+import tvb_phaseplane
+from tvb_phaseplane import PhasePlaneWidget
 
 
 def test_display_mode_default_is_full():
@@ -57,7 +57,7 @@ def test_standalone_default_is_full():
 
 def test_js_template_contains_phase_only_class():
     """The inline JS source must conditionally add ppw-phase-only class."""
-    from phase_plane_widget.widget import PhasePlaneWidget as PW
+    from tvb_phaseplane.widget import PhasePlaneWidget as PW
 
     js = PW._esm
     assert "ppw-phase-only" in js
@@ -66,7 +66,7 @@ def test_js_template_contains_phase_only_class():
 
 def test_css_contains_phase_only_rules():
     """The inline CSS must contain rules for ppw-phase-only."""
-    from phase_plane_widget.widget import PhasePlaneWidget as PW
+    from tvb_phaseplane.widget import PhasePlaneWidget as PW
 
     css = PW._css
     assert ".ppw-widget.ppw-phase-only" in css

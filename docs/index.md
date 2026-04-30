@@ -19,11 +19,11 @@ Explore dynamical systems in real time, directly in the browser — in Jupyter, 
 ### Jupyter / VS Code
 
 ```bash
-pip install phase-plane-widget
+pip install tvb_phaseplane
 ```
 
 ```python
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 widget = PhasePlaneWidget(model_name="mpr")
 widget
@@ -32,7 +32,7 @@ widget
 ### Custom Model
 
 ```python
-from phase_plane_widget import phase_plane
+from tvb_phaseplane import phase_plane
 
 pp = phase_plane(
     equations=["a*x - x**3 - y", "x - b*y"],

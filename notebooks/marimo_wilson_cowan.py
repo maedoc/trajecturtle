@@ -18,7 +18,7 @@ def _(mo):
 @app.cell
 def _():
     import marimo as mo
-    from phase_plane_widget import PhasePlaneWidget
+    from tvb_phaseplane import PhasePlaneWidget
 
     return PhasePlaneWidget, mo
 

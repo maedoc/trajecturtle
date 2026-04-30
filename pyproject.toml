@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "phase-plane-widget"
+name = "tvb_phaseplane"
 version = "0.1.0"
 description = "Interactive phase plane widget for neural mass models"
 readme = "README.md"
@@ -30,7 +30,7 @@ docs = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/phase_plane_widget"]
+packages = ["src/tvb_phaseplane"]
 
 [dependency-groups]
 dev = [

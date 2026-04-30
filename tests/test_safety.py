@@ -14,13 +14,13 @@ import subprocess
 import sys
 import tempfile
 
-import phase_plane_widget
+import tvb_phaseplane
 
 
 def _get_js_source():
     """Get the full JS source from the widget (same as _esm)."""
     # The widget stores its JS inline; grab it from the class.
-    return phase_plane_widget.widget.PhasePlaneWidget._esm
+    return tvb_phaseplane.widget.PhasePlaneWidget._esm
 
 
 def _run_node_script(js_code: str) -> dict:
@@ -225,7 +225,7 @@ console.log(JSON.stringify({{
 
 def test_widget_instantiation():
     """Widget can be created with Wilson-Cowan defaults."""
-    widget = phase_plane_widget.PhasePlaneWidget(model_name="wilson_cowan")
+    widget = tvb_phaseplane.PhasePlaneWidget(model_name="wilson_cowan")
     assert widget.model_name == "wilson_cowan"
     assert "aee" in widget.params
     assert widget.t_max == 100.0

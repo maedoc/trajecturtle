@@ -22,7 +22,7 @@
 # the two wells.
 
 # %%
-from phase_plane_widget import phase_plane
+from tvb_phaseplane import phase_plane
 
 pp = phase_plane(
     equations=["x - x**3", "-y"],

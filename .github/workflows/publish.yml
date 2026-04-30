@@ -1,0 +1,30 @@
+name: Publish tvb_phaseplane
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on tag pushes (e.t. v1.0.0)
+
+jobs:
+  build-n-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # REQUIRED for Trusted Publishing
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: python -m pip install build
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@release/v1

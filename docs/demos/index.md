@@ -75,7 +75,7 @@ Each iframe loads a [standalone HTML export](../deployment.md#3-standalone-html-
 To generate your own:
 
 ```python
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 widget = PhasePlaneWidget(model_name="mpr")
 widget.params["eta_bar"] = -5.0

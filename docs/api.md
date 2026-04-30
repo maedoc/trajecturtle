@@ -2,7 +2,7 @@
 
 ## `PhasePlaneWidget`
 
-::: phase_plane_widget.widget.PhasePlaneWidget
+::: tvb_phaseplane.widget.PhasePlaneWidget
     handler: python
     options:
       show_root_heading: true
@@ -14,7 +14,7 @@
 
 ## Model Base Class
 
-::: phase_plane_widget.models.BaseModel
+::: tvb_phaseplane.models.BaseModel
     handler: python
     options:
       show_root_heading: true
@@ -28,7 +28,7 @@
 
 ## Wilson-Cowan
 
-::: phase_plane_widget.models.WilsonCowan
+::: tvb_phaseplane.models.WilsonCowan
     handler: python
     options:
       show_root_heading: true
@@ -36,7 +36,7 @@
 
 ## FitzHugh-Nagumo
 
-::: phase_plane_widget.models.FitzHughNagumo
+::: tvb_phaseplane.models.FitzHughNagumo
     handler: python
     options:
       show_root_heading: true
@@ -44,7 +44,7 @@
 
 ## MPR (Quadratic Integrate-and-Fire)
 
-::: phase_plane_widget.models.MPRModel
+::: tvb_phaseplane.models.MPRModel
     handler: python
     options:
       show_root_heading: true

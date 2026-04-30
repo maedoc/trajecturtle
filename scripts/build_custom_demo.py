@@ -13,7 +13,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "src"))
 
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 
 def build():

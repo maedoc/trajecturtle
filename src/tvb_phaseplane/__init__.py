@@ -59,7 +59,7 @@ def phase_plane(
 
     Examples
     --------
-    >>> from phase_plane_widget import phase_plane
+    >>> from tvb_phaseplane import phase_plane
     >>> pp = phase_plane(
     ...     equations=['a*x - x**3 - y', 'x - b*y', 'c*(x - z)'],
     ...     state_vars={'x': (-3, 3), 'y': (-3, 3), 'z': (0, 5)},

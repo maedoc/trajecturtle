@@ -39,7 +39,7 @@ uv pip install -e ".[dev]"
 ### Jupyter / VS Code — Built-in Models
 
 ```python
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 widget = PhasePlaneWidget()
 widget  # display interactive widget
@@ -48,7 +48,7 @@ widget  # display interactive widget
 ### Custom Model
 
 ```python
-from phase_plane_widget import phase_plane
+from tvb_phaseplane import phase_plane
 
 # Define any ODE system
 pp = phase_plane(
@@ -85,7 +85,7 @@ pp = phase_plane(
 ### Standalone HTML Export
 
 ```python
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 widget = PhasePlaneWidget()
 widget.to_standalone_html("widget.html", title="My Model")

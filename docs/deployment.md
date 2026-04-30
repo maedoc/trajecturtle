@@ -7,7 +7,7 @@ The phase plane widget supports three deployment modes, each optimized for a dif
 The native environment. All interactivity is client-side after the initial cell execution.
 
 ```python
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 widget = PhasePlaneWidget(model_name="mpr")
 widget.params["J"] = 20.0
@@ -24,7 +24,7 @@ widget
 ### Custom Models in Jupyter {#custom-models}
 
 ```python
-from phase_plane_widget import phase_plane
+from tvb_phaseplane import phase_plane
 
 pp = phase_plane(
     equations=["a*x - x**3 - y", "x - b*y"],
@@ -52,7 +52,7 @@ jupytext --sync demo.ipynb   # keep .py and .ipynb in sync
 VS Code's built-in Jupyter extension supports `anywidget` out of the box.
 
 ```python
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 widget = PhasePlaneWidget()
 widget  # Renders in the VS Code output panel
 ```
@@ -66,7 +66,7 @@ No extra configuration needed.
 For blogs, documentation, course materials, or any static site where you cannot run a Python kernel:
 
 ```python
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 widget = PhasePlaneWidget(model_name="mpr")
 widget.to_standalone_html("mpr_demo.html", title="MPR Phase Plane")
@@ -75,7 +75,7 @@ widget.to_standalone_html("mpr_demo.html", title="MPR Phase Plane")
 ### Custom Models in Standalone HTML
 
 ```python
-from phase_plane_widget import phase_plane
+from tvb_phaseplane import phase_plane
 
 pp = phase_plane(
     equations=["a*x - y", "x - b*y"],
@@ -119,7 +119,7 @@ This entire documentation site uses this technique — every [demo](demos/index.
 
 ```python
 from ipywidgets.embed import embed_minimal_html
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 widget = PhasePlaneWidget()
 embed_minimal_html("export.html", views=[widget], title="Phase Plane",

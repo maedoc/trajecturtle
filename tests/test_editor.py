@@ -1,6 +1,6 @@
 """Test the live editor UI components."""
 
-from phase_plane_widget import PhasePlaneWidget, phase_plane
+from tvb_phaseplane import PhasePlaneWidget, phase_plane
 
 
 def test_standalone_html_has_editor_elements():

@@ -13,11 +13,11 @@
 # %% [markdown]
 # # Phase Plane Widget Demo
 #
-# Interactive visualization of neural mass models using `phase_plane_widget`.
+# Interactive visualization of neural mass models using `tvb_phaseplane`.
 # This notebook works in Jupyter, VS Code, and can be exported to static HTML.
 
 # %%
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 # Create and display the widget
 widget = PhasePlaneWidget()

@@ -9,7 +9,7 @@ import tempfile
 import pytest
 import sympy as sp
 
-from phase_plane_widget.sympy_js import FUNCTION_MAP, sympy_to_js, transpile_custom_function
+from tvb_phaseplane.sympy_js import FUNCTION_MAP, sympy_to_js, transpile_custom_function
 
 # ── Symbol pool ──
 SYMBOLS = [sp.Symbol(c) for c in "xyzuvw"]

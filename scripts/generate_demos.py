@@ -17,7 +17,7 @@ from pathlib import Path
 # Ensure the package is importable
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from phase_plane_widget import PhasePlaneWidget
+from tvb_phaseplane import PhasePlaneWidget
 
 
 def build_custom_demo():
