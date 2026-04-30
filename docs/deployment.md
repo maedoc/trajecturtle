@@ -186,7 +186,9 @@ The widget automatically locates fixed points (equilibria) by intersecting nullc
 1. **Nullcline intersection** → candidate location  
 2. **Newton–Raphson refinement** → precise `(x*, y*)`  
 3. **Jacobian eigenvalues** at the fixed point → preliminary type  
-4. **Dynamic validation**: a 3-second RK4 trajectory is launched from ` (x*+0.02, y*+0.02)` and compared against the eigenvalue prediction. If the two methods disagree (possible near bifurcations where numerical noise matters), the eigenvalue result is recomputed at the refined point and used as the final label.
+4. **Dynamic validation** (for non-saddles): a 3-second RK4 trajectory is launched from `(x*+0.02, y*+0.02)`.  
+   - **Stable / unstable points**: the trajectory must converge / diverge respectively.  If it doesn't, the eigenvalue classification is recomputed at the refined point.  
+   - **Saddles are skipped**: a generic perturbation near a saddle always contains a component along the unstable manifold, so forward integration can only diverge — the test is structurally incapable of confirming (or refuting) a saddle.  The eigenvalue-based "saddle" label (opposite real-part signs on a 2×2 Jacobian) is already unambiguous.
 
 ### Visual Legend
 

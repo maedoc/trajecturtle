@@ -13075,31 +13075,54 @@ function _quickRk4(f, y0, t0, tf, dt, params) {
 
 /** Validate a fixed point by running a short trajectory from a perturbed IC.
  *  Cross-checks the eigenvalue-based classification against actual dynamics.
- *  Does NOT display the validation trajectory — it is for classification only. */
+ *  Does NOT display the validation trajectory — it is for classification only.
+ *
+ *  IMPORTANT: Saddles are skipped.  A generic perturbation near a saddle has
+ *  a component along the unstable manifold, so forward integration always
+ *  diverges; this makes the test useless for saddles.  The eigenvalue-based
+ *  "saddle" label (opposite signs on a 2×2 Jacobian) is already robust.
+ */
 function validateFixedPoint(f, fp, params, classification) {
+  // Saddles: skip — forward integration from a random perturbation never
+  // converges to a saddle, so the test is structurally incapable of confirming
+  // the classification.
+  if (classification === "saddle") {
+    return classification;
+  }
+
   const eps = 0.02;
   const tEnd = 3.0;
   const dt = 0.01;
   const y0 = [fp[0] + eps, fp[1] + eps];
   const yEnd = _quickRk4(f, y0, 0, tEnd, dt, params);
 
-  const distStart = Math.sqrt((y0[0] - fp[0]) ** 2 + (y0[1] - fp[1]) ** 2);
-  const distEnd = Math.sqrt((yEnd[0] - fp[0]) ** 2 + (yEnd[1] - fp[1]) ** 2);
+  const distStart = Math.sqrt(
+    (y0[0] - fp[0]) ** 2 + (y0[1] - fp[1]) ** 2
+  );
+  const distEnd = Math.sqrt(
+    (yEnd[0] - fp[0]) ** 2 + (yEnd[1] - fp[1]) ** 2
+  );
 
-  const converges = distEnd < distStart * 0.5;
-  const diverges = distEnd > distStart * 2.0;
+  // Stable node / focus: verify the trajectory actually converges
+  if (classification.startsWith("stable")) {
+    if (distEnd < distStart * 0.5) {
+      return classification;                 // confirmed
+    }
+    // Did not converge → recompute (numerical noise near bifurcation?)
+    const J = jacobianND(f, [fp[0], fp[1]], params);
+    return classifyFixedPoint(eigenvalues2x2(J));
+  }
 
-  // Cross-check with eigenvalue classification
-  if (converges && !classification.startsWith("stable")) {
+  // Unstable node / focus: verify the trajectory actually diverges
+  if (classification.startsWith("unstable")) {
+    if (distEnd > distStart * 2.0) {
+      return classification;                 // confirmed
+    }
+    // Did not diverge → recompute
     const J = jacobianND(f, [fp[0], fp[1]], params);
-    const ev = eigenvalues2x2(J);
-    return classifyFixedPoint(ev);
+    return classifyFixedPoint(eigenvalues2x2(J));
   }
-  if (diverges && !classification.startsWith("unstable")) {
-    const J = jacobianND(f, [fp[0], fp[1]], params);
-    const ev = eigenvalues2x2(J);
-    return classifyFixedPoint(ev);
-  }
+
   return classification;
 }
 
