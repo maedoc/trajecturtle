@@ -13057,6 +13057,139 @@ function classifyFixedPoint(eigenvalues) {
   return "saddle";
 }
 
+/** Quick RK4 stepper for validation trajectories. */
+function _quickRk4(f, y0, t0, tf, dt, params) {
+  let t = t0;
+  let y = [...y0];
+  while (t < tf - 1e-12) {
+    const h = Math.min(dt, tf - t);
+    const k1 = f(t, y, params);
+    const k2 = f(t + h / 2, y.map((yi, i) => yi + (h / 2) * k1[i]), params);
+    const k3 = f(t + h / 2, y.map((yi, i) => yi + (h / 2) * k2[i]), params);
+    const k4 = f(t + h, y.map((yi, i) => yi + h * k3[i]), params);
+    y = y.map((yi, i) => yi + (h / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+    t += h;
+  }
+  return y;
+}
+
+/** Validate a fixed point by running a short trajectory from a perturbed IC.
+ *  Cross-checks the eigenvalue-based classification against actual dynamics.
+ *  Does NOT display the validation trajectory — it is for classification only. */
+function validateFixedPoint(f, fp, params, classification) {
+  const eps = 0.02;
+  const tEnd = 3.0;
+  const dt = 0.01;
+  const y0 = [fp[0] + eps, fp[1] + eps];
+  const yEnd = _quickRk4(f, y0, 0, tEnd, dt, params);
+
+  const distStart = Math.sqrt((y0[0] - fp[0]) ** 2 + (y0[1] - fp[1]) ** 2);
+  const distEnd = Math.sqrt((yEnd[0] - fp[0]) ** 2 + (yEnd[1] - fp[1]) ** 2);
+
+  const converges = distEnd < distStart * 0.5;
+  const diverges = distEnd > distStart * 2.0;
+
+  // Cross-check with eigenvalue classification
+  if (converges && !classification.startsWith("stable")) {
+    const J = jacobianND(f, [fp[0], fp[1]], params);
+    const ev = eigenvalues2x2(J);
+    return classifyFixedPoint(ev);
+  }
+  if (diverges && !classification.startsWith("unstable")) {
+    const J = jacobianND(f, [fp[0], fp[1]], params);
+    const ev = eigenvalues2x2(J);
+    return classifyFixedPoint(ev);
+  }
+  return classification;
+}
+
+/** Draw a fixed-point marker whose shape encodes stability type. */
+function drawFixedPointMarker(ctx, sx, sy, stability, radius = 7) {
+  const color = STABILITY_COLORS[stability] || "#666";
+  ctx.lineWidth = 1.5;
+
+  switch (stability) {
+    case "stable_node": {
+      // Filled circle ●
+      ctx.beginPath();
+      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = "#333";
+      ctx.stroke();
+      break;
+    }
+    case "stable_focus": {
+      // Filled circle with white inner dot (target)
+      ctx.beginPath();
+      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = "#333";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(sx, sy, radius * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      break;
+    }
+    case "unstable_node": {
+      // Open circle ○
+      ctx.beginPath();
+      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      break;
+    }
+    case "unstable_focus": {
+      // Open circle with inner cross
+      ctx.beginPath();
+      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      const r2 = radius * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(sx - r2, sy - r2);
+      ctx.lineTo(sx + r2, sy + r2);
+      ctx.moveTo(sx + r2, sy - r2);
+      ctx.lineTo(sx - r2, sy + r2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      break;
+    }
+    case "saddle": {
+      // Diamond ◆
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - radius);
+      ctx.lineTo(sx + radius, sy);
+      ctx.lineTo(sx, sy + radius);
+      ctx.lineTo(sx - radius, sy);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = "#333";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      break;
+    }
+    default: {
+      ctx.beginPath();
+      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = "#333";
+      ctx.stroke();
+    }
+  }
+}
+
 /** Grid-search + Newton-Raphson fixed-point finder (1D/2D). */
 function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
   const MAX_ITER_TOTAL = Math.max(625, nGrid * nGrid * 10);
@@ -13089,7 +13222,8 @@ function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
             if (isNew) {
               const J1D = jacobianND(f, [x], params);
               const deriv = J1D[0][0];
-              const stability = deriv < -1e-6 ? 'stable_node' : deriv > 1e-6 ? 'unstable_node' : 'saddle';
+              let stability = deriv < -1e-6 ? 'stable_node' : deriv > 1e-6 ? 'unstable_node' : 'saddle';
+              stability = validateFixedPoint(f, [x, 0], params, stability);
               fixedPoints.push([x, 0, stability]);
             }
           }
@@ -13136,7 +13270,9 @@ function findFixedPoints(f, params, xlim, ylim, nGrid = 25) {
               if (isNew) {
                 const J = jacobianND(f, x, params);
                 const ev = eigenvalues2x2(J);
-                fixedPoints.push([x[0], x[1], classifyFixedPoint(ev)]);
+                let stability = classifyFixedPoint(ev);
+                stability = validateFixedPoint(f, [x[0], x[1]], params, stability);
+                fixedPoints.push([x[0], x[1], stability]);
               }
             }
             break;
@@ -14103,10 +14239,7 @@ export function render({ model, el }) {
       if (fps && fps.length > 0) {
         for (const [wx, wy, stability] of fps) {
           const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
-          const color = STABILITY_COLORS[stability] || "#666";
-          phaseCtx.beginPath(); phaseCtx.arc(sx, sy, 7, 0, Math.PI * 2);
-          phaseCtx.fillStyle = color; phaseCtx.fill();
-          phaseCtx.strokeStyle = "#333"; phaseCtx.lineWidth = 1.5; phaseCtx.stroke();
+          drawFixedPointMarker(phaseCtx, sx, sy, stability, 7);
         }
       }
     }
@@ -14297,9 +14430,8 @@ export function render({ model, el }) {
         const sx = pad + ((pval - pMin) / (pMax - pMin)) * plotW;
         const sy1 = h - pad - ((x - yMin) / (yMax - yMin)) * plotH;
         const sy2 = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;
-        const color = STABILITY_COLORS[stability] || "#666";
-        sweepCtx.fillStyle = color; sweepCtx.beginPath(); sweepCtx.arc(sx, sy1, 3, 0, Math.PI * 2); sweepCtx.fill();
-        sweepCtx.fillStyle = color; sweepCtx.beginPath(); sweepCtx.arc(sx, sy2, 3, 0, Math.PI * 2); sweepCtx.fill();
+        drawFixedPointMarker(sweepCtx, sx, sy1, stability, 3);
+        drawFixedPointMarker(sweepCtx, sx, sy2, stability, 3);
       }
     }
   }

@@ -177,9 +177,32 @@ embed_minimal_html("export.html", views=[widget], title="Phase Plane",
 | **Standalone HTML** | **None** | **None** | **~700 KB** | **Docs, blogs, courses** |
 | `embed_minimal_html` | Required to generate | Required to view | ~2 KB + CDN | Sharing with Jupyter users |
 
----
+## Fixed-Point Detection & Classification
 
-## CI/CD: Auto-Generated Documentation
+The widget automatically locates fixed points (equilibria) by intersecting nullclines and refining with a Newton–Raphson solver. Each detected point is **validated** with a short trajectory starting from a perturbed initial condition near the equilibrium. The trajectory is **not** displayed; it serves only as a cross-check of the eigenvalue-based classification.
+
+### Classification Method
+
+1. **Nullcline intersection** → candidate location  
+2. **Newton–Raphson refinement** → precise `(x*, y*)`  
+3. **Jacobian eigenvalues** at the fixed point → preliminary type  
+4. **Dynamic validation**: a 3-second RK4 trajectory is launched from ` (x*+0.02, y*+0.02)` and compared against the eigenvalue prediction. If the two methods disagree (possible near bifurcations where numerical noise matters), the eigenvalue result is recomputed at the refined point and used as the final label.
+
+### Visual Legend
+
+| Symbol | Type | Meaning |
+|--------|------|---------|
+| ● filled circle | **Stable node** | Both eigenvalues real & negative; trajectories approach monotonically |
+| ◉ target ring | **Stable focus** | Complex-conjugate eigenvalues with negative real part; spirals inward |
+| ○ open circle | **Unstable node** | Both eigenvalues real & positive; trajectories diverge monotonically |
+| ⊕ circled cross | **Unstable focus** | Complex-conjugate eigenvalues with positive real part; spirals outward |
+| ◆ diamond | **Saddle** | Eigenvalues of opposite sign; stable manifold & unstable manifold |
+
+The color key (green for stable, red/orange for unstable, purple for saddle) is preserved alongside the new shapes so that colour-blind users can still distinguish categories.
+
+### References
+
+- Scholarpedia, *Equilibrium*: http://www.scholarpedia.org/article/Equilibrium — in particular the two-dimensional analysis and Figure 3 showing the eigenvalue-based classification diagram.
 
 This site is built automatically by a GitHub Actions workflow that:
 
