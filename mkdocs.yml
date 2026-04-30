@@ -73,6 +73,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Models: models.md
+  - Case Studies: case-studies.md
   - Deployment: deployment.md
   - API Reference: api.md
   - Demos: demos/index.md
