@@ -288,3 +288,196 @@ render({{ model: mockModel, el: document.getElementById('ppw-root') }});
 </html>"""
 
         pathlib.Path(filename).write_text(html, encoding="utf-8")
+
+    # ── TikZ / PGFPlots export ──
+
+    STABILITY_MARKERS = {
+        "stable_node": ("circle", "green!70!black", "green!70!black"),
+        "stable_focus": ("circle", "green!70!black", "green!70!black"),
+        "unstable_node": ("circle", "red!70!black", "white"),
+        "unstable_focus": ("circle", "red!70!black", "white"),
+        "saddle": ("diamond", "purple", "purple"),
+    }
+
+    def _compute_vector_field_for_tikz(self, nx=15, ny=15):
+        r"""Compute a normalized vector-field grid for embedding in TikZ.
+
+        Returns a list of arrow endpoints ``[x1, y1, x2, y2]`` suitable for
+        ``\draw[-stealth] (axis cs:x1,y1) -- (axis cs:x2,y2);``.
+        """
+        model = self._get_model()
+        x = np.linspace(self.xlim[0], self.xlim[1], nx)
+        y = np.linspace(self.ylim[0], self.ylim[1], ny)
+        dx = self.xlim[1] - self.xlim[0]
+        dy = self.ylim[1] - self.ylim[0]
+        scale = 0.03 * min(dx, dy)
+        arrows = []
+        for xi in x:
+            for yi in y:
+                state = [0.0] * model.dim
+                if self.display and len(self.display) >= 2:
+                    state[self.display[0]] = xi
+                    state[self.display[1]] = yi
+                else:
+                    state[0] = xi
+                    if model.dim > 1:
+                        state[1] = yi
+                if self.clamped:
+                    for i, val in enumerate(self.clamped):
+                        if val is not None and i < model.dim:
+                            state[i] = val
+                d = model.f(0, state, self.params)
+                norm = np.sqrt(d[0] ** 2 + d[1] ** 2)
+                if norm > 1e-12:
+                    x2 = xi + scale * d[0] / norm
+                    y2 = yi + scale * d[1] / norm
+                    arrows.append([float(xi), float(yi), float(x2), float(y2)])
+        return arrows
+
+    @staticmethod
+    def _fmt_coords(data):
+        """Format a list of [x, y] pairs as PGFPlots ``coordinates`` block."""
+        if not data:
+            return "coordinates {(0,0)}"
+        pairs = " ".join(f"({row[0]:.6f},{row[1]:.6f})" for row in data)
+        return f"coordinates {{\n  {pairs}\n}}"
+
+    def export_tikz(self, filename: str | pathlib.Path = "phase_plane.tex"):
+        """Generate a self-contained ``.tex`` file.
+
+        The resulting file can be compiled with ``pdflatex`` or ``lualatex``
+        (requires the ``pgfplots`` package).
+
+        Parameters
+        ----------
+        filename : str or pathlib.Path
+            Output path for the ``.tex`` file.
+        """
+        filename = pathlib.Path(filename)
+
+        x_label = (
+            self.state_names[self.display[0]]
+            if self.display and len(self.state_names) > self.display[0]
+            else "x"
+        )
+        y_label = (
+            self.state_names[self.display[1]]
+            if self.display and len(self.state_names) > self.display[1]
+            else "y"
+        )
+        xlim = self.xlim
+        ylim = self.ylim
+
+        # ── vector field ──
+        vfield_data = []
+        if self.show_vector_field:
+            vfield_data = self._compute_vector_field_for_tikz()
+
+        # ── trajectories ──
+        traj_data = []
+        if self.show_trajectory and self.trajectory:
+            idx_x = 1 + self.display[0]
+            idx_y = 1 + self.display[1]
+            traj_data = [
+                [float(row[idx_x]), float(row[idx_y])] for row in self.trajectory
+            ]
+
+        # ── nullclines ──
+        nc_x = self.nullcline_x if self.show_nullclines else []
+        nc_y = self.nullcline_y if self.show_nullclines else []
+
+        # ── fixed points ──
+        fps = self.fixed_points if self.show_fixed_points else []
+
+        # ── build plot commands ──
+        plots = []
+
+        if vfield_data:
+            lines = "\n".join(
+                f"            \\draw[-stealth, gray] (axis cs:{x1:.6f},{y1:.6f}) -- (axis cs:{x2:.6f},{y2:.6f});"
+                for x1, y1, x2, y2 in vfield_data
+            )
+            plots.append(lines)
+
+        if nc_x:
+            plots.append(
+                f"            \\addplot[blue, thick, no marks, smooth] {self._fmt_coords(nc_x)};"
+            )
+
+        if nc_y:
+            plots.append(
+                f"            \\addplot[red, thick, no marks, smooth] {self._fmt_coords(nc_y)};"
+            )
+
+        if traj_data:
+            plots.append(
+                f"            \\addplot[green!60!black, thick, no marks, smooth] {self._fmt_coords(traj_data)};"
+            )
+
+        plots_block = "\n".join(plots)
+
+        # ── fixed-point nodes ──
+        fp_nodes = []
+        for fp in fps:
+            if len(fp) < 3:
+                continue
+            x_fp, y_fp, stability = float(fp[0]), float(fp[1]), fp[2]
+            shape, color, fill = self.STABILITY_MARKERS.get(
+                stability, ("circle", "black", "white")
+            )
+            inner = ""
+            if stability == "stable_focus":
+                inner = (
+                    f"\\node[fill={color}, circle, inner sep=0.8pt] "
+                    f"at (axis cs:{x_fp:.6f},{y_fp:.6f}) {{}};"
+                )
+            elif stability == "unstable_focus":
+                inner = (
+                    f"\\node[draw={color}, fill={color}, circle, inner sep=0.8pt] "
+                    f"at (axis cs:{x_fp:.6f},{y_fp:.6f}) {{}};"
+                )
+            opts = f"draw={color}"
+            if fill == "white":
+                opts += ", fill=white"
+            elif fill != color:
+                opts += f", fill={fill}"
+            node_tex = (
+                f"\\node[{opts}, {shape}, inner sep=1.5pt] "
+                f"at (axis cs:{x_fp:.6f},{y_fp:.6f}) {{}};"
+            )
+            if inner:
+                node_tex += "\n            " + inner
+            fp_nodes.append(node_tex)
+        fp_block = "\n            ".join(fp_nodes)
+
+        # ── parameter annotation ──
+        param_lines = ", ".join(f"{k.replace('_', '\\_')}={v:.4g}" for k, v in self.params.items())
+        param_node = (
+            r"\path (rel axis cs:0.02,0.98) node[anchor=north west, font=\tiny, align=left] "
+            f"{{{self.model_name.replace('_', '\\_')}\\\\ {param_lines}}};"
+        )
+
+        tex = (
+            r"\documentclass[border=5pt]{standalone}" + "\n"
+            r"\usepackage{pgfplots}" + "\n"
+            r"\usepackage{tikz}" + "\n"
+            r"\pgfplotsset{compat=1.17}" + "\n"
+            r"\usetikzlibrary{shapes.geometric}" + "\n"
+            r"\begin{document}" + "\n"
+            r"\begin{tikzpicture}" + "\n"
+            r"\begin{axis}[" + "\n"
+            "    width=10cm, height=10cm,\n"
+            f"    xmin={xlim[0]}, xmax={xlim[1]}, ymin={ylim[0]}, ymax={ylim[1]},\n"
+            f"    xlabel=${x_label}$, ylabel=${y_label}$,\n"
+            "    axis lines=middle,\n"
+            "    enlargelimits=true,\n"
+            "]\n"
+            + plots_block + "\n"
+            + (fp_block + "\n" if fp_block else "")
+            + "            " + param_node + "\n"
+            r"\end{axis}" + "\n"
+            r"\end{tikzpicture}" + "\n"
+            r"\end{document}" + "\n"
+        )
+        filename.write_text(tex, encoding="utf-8")
+        return str(filename)

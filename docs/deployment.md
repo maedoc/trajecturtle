@@ -202,6 +202,34 @@ The widget automatically locates fixed points (equilibria) by intersecting nullc
 
 The color key (green for stable, red/orange for unstable, purple for saddle) is preserved alongside the new shapes so that colour-blind users can still distinguish categories.
 
+### TikZ / PGFPlots Export
+
+For publication-quality figures, the widget can export the current phase plane to a self-contained ``.tex`` file:
+
+```python
+from tvb_phaseplane import PhasePlaneWidget
+
+widget = PhasePlaneWidget(model_name="wilson_cowan")
+# ... interact with the widget ...
+widget.export_tikz("phase_plane.tex")
+```
+
+The generated ``.tex`` file embeds all data (vector field arrows, nullclines, trajectory, fixed points) as inline ``coordinates`` and ``\draw`` commands.  It requires the ``pgfplots`` package and compiles with ``pdflatex`` or ``lualatex``:
+
+```bash
+pdflatex phase_plane.tex
+```
+
+### What Is Exported
+
+- **Vector field**: a grid of ``\draw[-stealth, gray]`` arrows computed and normalized in Python.
+- **Nullclines**: ``\addplot[blue, ...]`` and ``\addplot[red, ...]`` with embedded coordinate lists.
+- **Trajectory**: ``\addplot[green!60!black, ...]`` with embedded coordinate list.
+- **Fixed points**: TikZ ``\node`` markers whose shapes encode stability (circle for nodes/foci, diamond for saddles; green for stable, red for unstable, purple for saddles).
+- **Parameter annotation**: a small ``\node`` in the top-left corner listing the current model name and parameter values.
+
+The widget UI also contains an **Export TikZ** button (beside the Export SVG button) that sends a message to the Python kernel for potential future integration.
+
 ### References
 
 - Scholarpedia, *Equilibrium*: http://www.scholarpedia.org/article/Equilibrium — in particular the two-dimensional analysis and Figure 3 showing the eigenvalue-based classification diagram.

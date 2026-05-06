@@ -579,3 +579,27 @@
     aspect-ratio: 1 / 1;
     max-height: none;
 }
+
+.ppw-export-row {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+.ppw-export-row button {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background: #fff;
+  color: #495057;
+  cursor: pointer;
+}
+.ppw-export-row button:hover {
+  background: #e9ecef;
+}
+.ppw-export-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
