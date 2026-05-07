@@ -15843,9 +15843,30 @@ export function render({ model, el }) {
   editorApplyBtn.addEventListener("click", applyEditor);
   editorCopyBtn.addEventListener("click", copySpec);
   el.querySelector(".ppw-export-svg").addEventListener("click", exportToSVG);
-  el.querySelector(".ppw-export-tikz").addEventListener("click", () => {
+
+  // TikZ export requires a live Python kernel; disabled in standalone.
+  const tikzBtn = el.querySelector(".ppw-export-tikz");
+  if (isStandalone) {
+    tikzBtn.disabled = true;
+    tikzBtn.title = "TikZ export requires a Jupyter kernel";
+  }
+  tikzBtn.addEventListener("click", () => {
+    if (isStandalone) {
+      alert("TikZ export requires a Jupyter kernel. Use widget.export_tikz('file.tex') in a notebook cell instead.");
+      return;
+    }
     model.send({ type: "export_tikz" });
   });
+
+  // Listen for TikZ data coming back from the Python kernel
+  if (!isStandalone) {
+    model.on('msg:custom', (msg) => {
+      if (msg && msg.type === 'tikz_data') {
+        const blob = new Blob([msg.content], { type: 'application/x-tex' });
+        downloadBlob(blob, msg.filename || 'phase_plane.tex');
+      }
+    });
+  }
 
   // ═════════════════════════════════════════════════════════════
   //  INITIALISATION

@@ -7,7 +7,9 @@ Two usage modes:
 """
 
 import json
+import os
 import pathlib
+import tempfile
 
 import anywidget
 import numpy as np
@@ -98,6 +100,8 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             kwargs.setdefault("model_name", model.name)
         super().__init__(**kwargs)
         self._update_model()
+        # Register handler for custom JS → Python messages (e.g. TikZ export)
+        self.on_msg(self._on_custom_msg)
 
     def _get_model(self):
         from .models import MODEL_REGISTRY
@@ -481,3 +485,24 @@ render({{ model: mockModel, el: document.getElementById('ppw-root') }});
         )
         filename.write_text(tex, encoding="utf-8")
         return str(filename)
+
+    # ── Custom message handler (JS → Python) ──
+
+    def _on_custom_msg(self, _widget, content, buffers):
+        """Handle messages from the JS front-end."""
+        msg_type = content.get("type")
+        if msg_type == "export_tikz":
+            fd, tmppath = tempfile.mkstemp(suffix=".tex", prefix="phase_plane_")
+            os.close(fd)
+            try:
+                self.export_tikz(tmppath)
+                tex_content = pathlib.Path(tmppath).read_text(encoding="utf-8")
+                self.send(
+                    {
+                        "type": "tikz_data",
+                        "content": tex_content,
+                        "filename": "phase_plane.tex",
+                    }
+                )
+            finally:
+                os.unlink(tmppath)
