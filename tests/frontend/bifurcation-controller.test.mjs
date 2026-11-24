@@ -325,10 +325,22 @@ test('lazy worker creation, bidirectional EP stitching, LC switch, 2D continuati
   assert.ok(lpc2Res);
   assert.equal(lpc2Res.branch.type, 'LPC2');
 
-  // Changing model clears branches and restartCache
+  // Generic traceAllTwoParam uses discovered LP + HB on param1 and switches to 2D
+  const all2d = await ctrl.traceAllTwoParam('b', { param1: 'I', rl2_0: null, rl2_1: null });
+  assert.equal(all2d.twoParamBranches.length, 2, 'Should trace both LP2 and HB2');
+  assert.equal(m.get('bifurcation_config').viewMode, '2d');
+
+  // Changing model clears branches, restartCache, presets, and model-specific config
+  m.set('bifurcation_presets', [{ label: 'FHN only', param1: 'I' }]);
+  ctrl.commit({ bifurcation_config: { ...m.get('bifurcation_config'), rl0: -2, rl1: 2, ds: 0.03 } });
   ctrl.selectModel('wilson_cowan');
   assert.deepEqual(m.get('bifurcation_branches'), []);
   assert.deepEqual(m.get('bifurcation_special_points'), []);
+  assert.deepEqual(m.get('bifurcation_presets'), []);
+  assert.equal(m.get('bifurcation_config').rl0, undefined);
+  assert.equal(m.get('bifurcation_config').param1, undefined);
+  assert.equal(m.get('bifurcation_config').viewMode, undefined);
+  assert.equal(m.get('bifurcation_config').ds, 0.03);
   assert.equal(ctrl.restartCache.size, 0);
 });
 

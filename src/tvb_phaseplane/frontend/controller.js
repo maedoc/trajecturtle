@@ -170,6 +170,20 @@ function createExperimentController(model) {
   let references = 0, pending = null, computing = false, disposed = false;
   let sweepJob = null, playback = null;
   let autoClient = null, bifurcationJob = null, bifurcationGeneration = 0;
+  let lastBifModelIdentity = _bifurcationModelIdentity(model);
+  function _resetBifurcationOnModelChange() {
+    controller.clearBifurcation();
+    if ((model.get('bifurcation_presets') || []).length > 0) {
+      model.set('bifurcation_presets', []);
+    }
+    const prevCfg = model.get('bifurcation_config') || {};
+    const nextCfg = { ...prevCfg };
+    let changed = false;
+    for (const k of ['param1', 'param2', 'range', 'range2', 'rl0', 'rl1', 'rl2_0', 'rl2_1', 'xlim1d', 'ylim1d', 'xlim2d', 'ylim2d', 'plane2d', 'viewMode', 'stopPeriod', 'observable']) {
+      if (k in nextCfg) { delete nextCfg[k]; changed = true; }
+    }
+    if (changed) model.set('bifurcation_config', nextCfg);
+  }
   function _getAutoClient() {
     if (!autoClient) autoClient = createAutoClient(model);
     return autoClient;
@@ -237,7 +251,10 @@ function createExperimentController(model) {
         const modelIdentity = _bifurcationModelIdentity(model);
         const bifMeta = model.get('bifurcation_metadata') || {};
         const bifBranches = model.get('bifurcation_branches') || [];
-        if (bifurcationJob && bifurcationJob.modelIdentity !== modelIdentity) {
+        if (modelIdentity !== lastBifModelIdentity) {
+          lastBifModelIdentity = modelIdentity;
+          _resetBifurcationOnModelChange();
+        } else if (bifurcationJob && bifurcationJob.modelIdentity !== modelIdentity) {
           controller.clearBifurcation();
         } else if (bifBranches.length > 0) {
           if (bifMeta.model_identity && bifMeta.model_identity !== modelIdentity) {
@@ -764,6 +781,42 @@ function createExperimentController(model) {
         }
       }
       return { ep: epRes, lc: lcRes, twoParam: twoParamRes };
+    },
+    async traceAllTwoParam(param2, config = {}, owner = null) {
+      const def = resolveModel(model.get('model_name'), model.get('model_spec'));
+      const cfg = { ...(model.get('bifurcation_config') || {}), ...config };
+      const param1 = cfg.param1 || Object.keys(def.defaultParams || {})[0];
+      if (!param1 || !param2 || param2 === param1) {
+        const job = _beginBifurcationJob(owner, _bifurcationModelIdentity(model));
+        return _failBifurcationJob(job, 'Choose two distinct continuation parameters for 2D continuation');
+      }
+      model.set('bifurcation_config', { ...cfg, param1, param2 });
+      emit(); sync();
+
+      const existingEp = (model.get('bifurcation_branches') || []).some(
+        (b) => b && b.type === 'EP' && b.param1 === param1,
+      );
+      let epRes = null;
+      if (!existingEp) {
+        epRes = await controller.startEquilibriumContinuation({ ...config, param1 }, owner);
+        if (!epRes || disposed) return null;
+      }
+
+      const sps = model.get('bifurcation_special_points') || [];
+      const firstLP = sps.find((sp) => sp && sp.ty === 'LP' && sp.param1 === param1);
+      const firstHB = sps.find((sp) => sp && sp.ty === 'HB' && sp.param1 === param1);
+      const twoParamBranches = [];
+      for (const sp of [firstLP, firstHB].filter(Boolean)) {
+        const res2d = await controller.startTwoParamContinuation(sp.id, param2, { ...config }, owner);
+        if (!res2d || disposed) break;
+        twoParamBranches.push(res2d);
+      }
+      if (twoParamBranches.length > 0 && !disposed) {
+        const nextCfg = model.get('bifurcation_config') || {};
+        model.set('bifurcation_config', { ...nextCfg, viewMode: '2d' });
+        emit(); sync();
+      }
+      return { ep: epRes, twoParamBranches };
     },
     jumpToBifurcationPoint(point, branch, opts = {}) {
       if (!point) return;

@@ -10,7 +10,7 @@ Click on the phase plane to set initial conditions, drag sliders to change param
 
 Client-side numerical continuation running **AUTO2000 compiled to WebAssembly** inside a Web Worker — no Python kernel or server required. Pre-loaded with the **DBT Fast Subsystem** ($\dot{x} = y,\; \dot{y} = -x^3 + \mu_{2C} w x - \mu_{1B} z - y(\nu_C w + b x + x^2)$) at $w = 0.2$, which exhibits **both Fold (`LP`) and Hopf (`HB`) bifurcations** along `z`, limit-cycle (`LC`) branches hitting high-period orbits near the homoclinic, 2-parameter `LP2`/`HB2`/`LPC2`/`PD2`/`HOM2` curves in `(z, w)`, and codim-2 markers (`CP`, `BT`, `GH`, `ZH`).
 
-Use **2D: (z, w) Fold + Hopf + Homoclinic** (or click individual `LP` / `HB` / `LPC` / `PD` / high-period `EP`/`UZ` chips) to trace the overlaid 2D curves, adjust **Plot axes** (`x min`, `x max`, `y min`, `y max`, `Auto`) to zoom into the cusp/Bogdanov–Takens region, or switch models / edit equations directly below.
+Use **2D: (z, w) Fold + Hopf + Homoclinic** on the DBT fast subsystem, or switch to **any** built-in or custom model below, pick any `Parameter` + `2nd param`, and use **Trace equilibria** / **Trace 2D (LP + HB)** to compute 1D and overlaid 2D curves live. Adjust **Plot axes** (`x min`, `x max`, `y min`, `y max`, `Auto`) to zoom into the cusp/Bogdanov–Takens region.
 
 **[Open full-width DBT bifurcation demo](bifurcation_auto2000.html){: target="_blank" rel="noopener" }** · **[Open MPR (QIF) bifurcation demo](bifurcation_mpr.html){: target="_blank" rel="noopener" }**
 

@@ -15451,6 +15451,20 @@ function createExperimentController(model) {
   let references = 0, pending = null, computing = false, disposed = false;
   let sweepJob = null, playback = null;
   let autoClient = null, bifurcationJob = null, bifurcationGeneration = 0;
+  let lastBifModelIdentity = _bifurcationModelIdentity(model);
+  function _resetBifurcationOnModelChange() {
+    controller.clearBifurcation();
+    if ((model.get('bifurcation_presets') || []).length > 0) {
+      model.set('bifurcation_presets', []);
+    }
+    const prevCfg = model.get('bifurcation_config') || {};
+    const nextCfg = { ...prevCfg };
+    let changed = false;
+    for (const k of ['param1', 'param2', 'range', 'range2', 'rl0', 'rl1', 'rl2_0', 'rl2_1', 'xlim1d', 'ylim1d', 'xlim2d', 'ylim2d', 'plane2d', 'viewMode', 'stopPeriod', 'observable']) {
+      if (k in nextCfg) { delete nextCfg[k]; changed = true; }
+    }
+    if (changed) model.set('bifurcation_config', nextCfg);
+  }
   function _getAutoClient() {
     if (!autoClient) autoClient = createAutoClient(model);
     return autoClient;
@@ -15518,7 +15532,10 @@ function createExperimentController(model) {
         const modelIdentity = _bifurcationModelIdentity(model);
         const bifMeta = model.get('bifurcation_metadata') || {};
         const bifBranches = model.get('bifurcation_branches') || [];
-        if (bifurcationJob && bifurcationJob.modelIdentity !== modelIdentity) {
+        if (modelIdentity !== lastBifModelIdentity) {
+          lastBifModelIdentity = modelIdentity;
+          _resetBifurcationOnModelChange();
+        } else if (bifurcationJob && bifurcationJob.modelIdentity !== modelIdentity) {
           controller.clearBifurcation();
         } else if (bifBranches.length > 0) {
           if (bifMeta.model_identity && bifMeta.model_identity !== modelIdentity) {
@@ -16045,6 +16062,42 @@ function createExperimentController(model) {
         }
       }
       return { ep: epRes, lc: lcRes, twoParam: twoParamRes };
+    },
+    async traceAllTwoParam(param2, config = {}, owner = null) {
+      const def = resolveModel(model.get('model_name'), model.get('model_spec'));
+      const cfg = { ...(model.get('bifurcation_config') || {}), ...config };
+      const param1 = cfg.param1 || Object.keys(def.defaultParams || {})[0];
+      if (!param1 || !param2 || param2 === param1) {
+        const job = _beginBifurcationJob(owner, _bifurcationModelIdentity(model));
+        return _failBifurcationJob(job, 'Choose two distinct continuation parameters for 2D continuation');
+      }
+      model.set('bifurcation_config', { ...cfg, param1, param2 });
+      emit(); sync();
+
+      const existingEp = (model.get('bifurcation_branches') || []).some(
+        (b) => b && b.type === 'EP' && b.param1 === param1,
+      );
+      let epRes = null;
+      if (!existingEp) {
+        epRes = await controller.startEquilibriumContinuation({ ...config, param1 }, owner);
+        if (!epRes || disposed) return null;
+      }
+
+      const sps = model.get('bifurcation_special_points') || [];
+      const firstLP = sps.find((sp) => sp && sp.ty === 'LP' && sp.param1 === param1);
+      const firstHB = sps.find((sp) => sp && sp.ty === 'HB' && sp.param1 === param1);
+      const twoParamBranches = [];
+      for (const sp of [firstLP, firstHB].filter(Boolean)) {
+        const res2d = await controller.startTwoParamContinuation(sp.id, param2, { ...config }, owner);
+        if (!res2d || disposed) break;
+        twoParamBranches.push(res2d);
+      }
+      if (twoParamBranches.length > 0 && !disposed) {
+        const nextCfg = model.get('bifurcation_config') || {};
+        model.set('bifurcation_config', { ...nextCfg, viewMode: '2d' });
+        emit(); sync();
+      }
+      return { ep: epRes, twoParamBranches };
     },
     jumpToBifurcationPoint(point, branch, opts = {}) {
       if (!point) return;
@@ -17236,6 +17289,8 @@ export function mountBifurcation({ model, controller, document: doc, el } = {}) 
       <label>Parameter <select class="ppw-bif-param1" aria-label="Continuation parameter"></select></label>
       <label>Observable <select class="ppw-bif-obs" aria-label="Observable"></select></label>
       <button type="button" class="ppw-bif-trace">Trace equilibria</button>
+      <label class="ppw-bif-global-p2-label">2nd param <select class="ppw-bif-global-param2" aria-label="Second continuation parameter"></select></label>
+      <button type="button" class="ppw-bif-trace-all-2d">Trace 2D (LP + HB)</button>
       <button type="button" class="ppw-bif-cancel" disabled>Cancel</button>
       <button type="button" class="ppw-bif-clear">Clear</button>
       <div class="ppw-bif-view-switch" hidden>
@@ -17286,6 +17341,9 @@ export function mountBifurcation({ model, controller, document: doc, el } = {}) 
   const param1Select = element.querySelector('.ppw-bif-param1');
   const obsSelect = element.querySelector('.ppw-bif-obs');
   const traceBtn = element.querySelector('.ppw-bif-trace');
+  const globalParam2Label = element.querySelector('.ppw-bif-global-p2-label');
+  const globalParam2Select = element.querySelector('.ppw-bif-global-param2');
+  const traceAll2DBtn = element.querySelector('.ppw-bif-trace-all-2d');
   const cancelBtn = element.querySelector('.ppw-bif-cancel');
   const clearBtn = element.querySelector('.ppw-bif-clear');
   const viewSwitch = element.querySelector('.ppw-bif-view-switch');
@@ -17316,7 +17374,7 @@ export function mountBifurcation({ model, controller, document: doc, el } = {}) 
     : new Set(['LP2', 'HB2', 'LPC2', 'PD2', 'HOM2']);
 
   let viewMode = '1d';
-  let paramSig = '', obsSig = '', presetsSig = '', chipsSig = '', planesSig = '', legendMode = '';
+  let paramSig = '', param2Sig = '', obsSig = '', presetsSig = '', chipsSig = '', planesSig = '', legendMode = '';
   let lastModelSig = '', last2DCount = 0, lastLatest2DKey = '';
 
   const surface = canvasSurface(
@@ -17471,6 +17529,7 @@ export function mountBifurcation({ model, controller, document: doc, el } = {}) 
   }
 
   scope.on(param1Select, 'change', () => updateConfig({ param1: param1Select.value }));
+  scope.on(globalParam2Select, 'change', () => updateConfig({ param2: globalParam2Select.value }));
   scope.on(obsSelect, 'change', () => {
     const val = obsSelect.value;
     updateConfig({ observable: val === 'L2' ? 'L2' : Number(val) });
@@ -17478,6 +17537,9 @@ export function mountBifurcation({ model, controller, document: doc, el } = {}) 
   scope.on(plane2DSelect, 'change', () => updateConfig({ plane2d: plane2DSelect.value }));
   scope.on(traceBtn, 'click', () => {
     controller.startEquilibriumContinuation({ param1: param1Select.value, ...readAdvancedConfig() }, owner);
+  });
+  scope.on(traceAll2DBtn, 'click', () => {
+    controller.traceAllTwoParam(globalParam2Select.value, { param1: param1Select.value, ...readAdvancedConfig() }, owner);
   });
   scope.on(rerunBtn, 'click', () => {
     controller.startEquilibriumContinuation({ param1: param1Select.value, ...readAdvancedConfig() }, owner);
@@ -17672,6 +17734,26 @@ export function mountBifurcation({ model, controller, document: doc, el } = {}) 
       param1Select.value = cfg.param1;
     }
 
+    const otherParamNames = paramNames.filter(p => p !== param1Select.value);
+    const nextParam2Sig = JSON.stringify(otherParamNames);
+    if (nextParam2Sig !== param2Sig) {
+      param2Sig = nextParam2Sig;
+      const prev2 = globalParam2Select.value;
+      globalParam2Select.replaceChildren();
+      for (const p of otherParamNames) {
+        const opt = targetDoc.createElement('option');
+        opt.value = p; opt.textContent = p;
+        globalParam2Select.append(opt);
+      }
+      if (cfg.param2 && otherParamNames.includes(cfg.param2)) globalParam2Select.value = cfg.param2;
+      else if (prev2 && otherParamNames.includes(prev2)) globalParam2Select.value = prev2;
+    } else if (cfg.param2 && otherParamNames.includes(cfg.param2) && globalParam2Select.value !== cfg.param2) {
+      globalParam2Select.value = cfg.param2;
+    }
+    const noSecondParam = otherParamNames.length === 0;
+    globalParam2Label.hidden = noSecondParam;
+    traceAll2DBtn.hidden = noSecondParam;
+
     const nextObsSig = JSON.stringify(stateNames);
     if (nextObsSig !== obsSig) {
       obsSig = nextObsSig;
@@ -17707,6 +17789,7 @@ export function mountBifurcation({ model, controller, document: doc, el } = {}) 
     for (const btn of presetsBox.querySelectorAll('button')) btn.disabled = running;
 
     traceBtn.disabled = running || !param1Select.value;
+    traceAll2DBtn.disabled = running || !param1Select.value || !globalParam2Select.value;
     cancelBtn.disabled = !running;
     clearBtn.disabled = running && branches.length === 0;
 

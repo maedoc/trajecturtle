@@ -263,6 +263,7 @@ test('mountBifurcation renders toolbar, presets, stale/non-smooth/N>2 banners, c
     startEquilibriumContinuation: (...a) => { calls.push(['startEP', ...a]); },
     switchToLimitCycle: (...a) => { calls.push(['switchLC', ...a]); },
     startTwoParamContinuation: (...a) => { calls.push(['start2D', ...a]); },
+    traceAllTwoParam: (...a) => { calls.push(['traceAll2D', ...a]); },
     runBifurcationPreset: (...a) => { calls.push(['preset', ...a]); },
     jumpToBifurcationPoint: (...a) => { calls.push(['jump', ...a]); },
     cancelBifurcation: (...a) => { calls.push(['cancel', ...a]); baseController.cancelBifurcation(...a); },
@@ -319,6 +320,12 @@ test('mountBifurcation renders toolbar, presets, stale/non-smooth/N>2 banners, c
   assert.equal(calls.at(-1)[0], 'start2D');
   assert.equal(calls.at(-1)[1], 'UZ1');
   assert.equal(calls.at(-1)[3].homoclinic, true);
+
+  // Generic toolbar Trace 2D (LP + HB) button
+  const globalP2 = host.querySelector('.ppw-bif-global-param2');
+  assert.deepEqual([...globalP2.options].map((o) => o.value), ['a']);
+  host.querySelector('.ppw-bif-trace-all-2d').click();
+  assert.deepEqual(calls.at(-1).slice(0, 2), ['traceAll2D', 'a']);
 
   // 1D/2D switch visibility
   assert.equal(host.querySelector('.ppw-bif-view-switch').hidden, true);
