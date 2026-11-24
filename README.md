@@ -59,7 +59,7 @@ lab = explore("fitzhugh_nagumo", params={"I": 0.5}, parameters=["I", "epsilon"])
 lab  # display in a notebook cell
 ```
 
-The built-in **View** picker switches between all five experimental layouts
+The built-in **View** picker switches between all eleven experimental layouts
 without resetting the experiment. `lab.presentation = "bench"` selects a layout
 from Python. For an existing experiment, use `experiment.explore()` to create a
 linked, switchable output. You can share an offline version with
@@ -73,7 +73,9 @@ in the notebook environment; no feedback is sent automatically.
 
 The supplementary [View design lab](docs/view-designs.md) includes working
 prototypes of a compact interactive figure, 16:9 experiment bench, instrument
-drawer, frozen-scene comparison lens and guided lesson. These experimental
+drawer, frozen-scene comparison lens and guided lesson, plus small multiples,
+a bifurcation-scan navigator, initial-condition explorer, evidence notebook,
+prediction/reveal and seeded stochastic ensembles. These experimental
 presentations share the same experiment and controls instead of stacking every
 panel into one long output.
 

@@ -82,6 +82,38 @@
 .ppw-widget.ppw-phase-only { max-width: 580px; }
 /* .ppw-controls is no longer instantiated: each requested panel owns its DOM. */
 
+/* Scientific-task prototypes: bounded controls and explicit preview ownership. */
+.ppw-research-view { min-width: 0; }
+.ppw-research-tools, .ppw-trace-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.ppw-research-tools label { font-size: 12px; }
+.ppw-research-tools input[type=number] { width: 6em; }
+.ppw-research-note, .ppw-research-status { font-size: 11px; margin: 6px 0; }
+.ppw-research-status { color: var(--ppw-error); min-height: 1em; }
+.ppw-research-plots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ppw-research-plot { min-width: 0; }
+.ppw-research-plot > strong { font-size: 12px; display: block; margin: 5px 0; }
+.ppw-multiples .ppw-research-plots { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ppw-basin .ppw-research-plots { grid-template-columns: 1fr; }
+.ppw-multiple-tile { min-width: 0; }
+.ppw-use-tile[aria-pressed=true] { border-color: var(--ppw-accent); font-weight: 600; }
+.ppw-prediction-answer { display: block; min-height: 46px; width: min(440px, 100%); }
+.ppw-evidence-cards { max-height: 330px; overflow: auto; }
+.ppw-evidence-cards article { border: 1px solid var(--ppw-border); padding: 8px; margin-bottom: 6px; border-radius: 6px; }
+.ppw-evidence-cards article p { font-size: 11px; margin: 4px 0; }
+.ppw-evidence-cards button { margin-right: 5px; }
+.ppw-navigator-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 230px 230px; gap: 8px; }
+.ppw-navigator-grid > .ppw-sweep { grid-row: 1 / 3; min-height: 0; overflow: auto; }
+.ppw-navigator-grid > .ppw-panel { min-width: 0; }
+.ppw-navigator-grid .ppw-sweep-controls { gap: 4px; font-size: 11px; }
+.ppw-navigator-grid .ppw-sweep-controls input { width: 5em; }
+.ppw-navigator-grid > .ppw-phase-container, .ppw-navigator-grid > .ppw-time-container { height: 100%; }
+.ppw-navigator-grid .ppw-sweep-header { font-size: 12px; }
+@container ppw (max-width: 700px) {
+  .ppw-research-plots, .ppw-multiples .ppw-research-plots { grid-template-columns: 1fr; }
+  .ppw-navigator-grid { grid-template-columns: 1fr; grid-template-rows: 460px 300px 280px; }
+  .ppw-navigator-grid > .ppw-sweep { grid-row: auto; }
+}
+
 /* Experimental compositions: a stable stage, not a vertical catalogue. */
 .ppw-widget.ppw-presentation-root { max-width: 1100px; padding: 4px; }
 .ppw-view-picker { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 6px 8px 10px; }

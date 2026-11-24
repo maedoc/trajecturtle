@@ -10,6 +10,12 @@ const modes = {
   drawer: ['Instrument drawer', 'Controls opens an instrument strip beside the plot. Close it to return to an uncluttered figure.'],
   comparison: ['Comparison lens', 'Freeze the scene, change I or epsilon, and compare muted nullclines, equilibrium rings and dashed paths with the live colors.'],
   lesson: ['Guided lesson', 'Explore, Observe, Compare and Sweep change the task, not the underlying experiment. Completed results and parameters survive task switches.'],
+  multiples: ['Small multiples', 'Compare three parameter values with linked axes and initial conditions. Use a tile explicitly to make it the live experiment.'],
+  navigator: ['Bifurcation navigator', 'Run a sampled scan, then click or navigate its parameter values to update the live phase plane and time series. This is not numerical continuation.'],
+  basin: ['Initial-condition explorer', 'Click to add several starts at fixed parameters. Compare labeled trajectories; this is not an automatic basin classification.'],
+  evidence: ['Evidence notebook', 'Capture labeled scenes, preview them without changing the experiment, restore explicitly, or download a reproducible JSON record.'],
+  prediction: ['Prediction & reveal', 'Predict an outcome from the nullclines and initial condition, then reveal the deliberately hidden trajectory.'],
+  ensemble: ['Stochastic ensemble', 'Compare 2–8 seeded Heun traces, then explicitly use a member. These are individual realizations, not confidence intervals.'],
 };
 const style = document.createElement('style');
 style.textContent = `
@@ -26,7 +32,7 @@ body { margin: 0; padding: 10px; background: #f0f4f8; font-family: system-ui, sa
 `;
 document.head.append(style);
 const header = document.createElement('header'); header.className = 'design-lab-header';
-header.innerHTML = '<h1>View design lab</h1><nav class="design-lab-nav" aria-label="View design"></nav><p class="design-lab-description"></p><p class="design-lab-note">One live experiment across all five designs. Switching a design preserves parameters and frozen references; Reset restores the starting experiment. These are working prototypes, not a settled layout API.</p>';
+header.innerHTML = '<h1>View design lab</h1><nav class="design-lab-nav" aria-label="View design"></nav><p class="design-lab-description"></p><p class="design-lab-note">One live experiment across all eleven designs. Switching a design preserves parameters and frozen references; Reset restores the starting experiment. These are working prototypes, not a settled layout API.</p>';
 document.body.prepend(header);
 const nav = header.querySelector('nav');
 for (const [value, [label]] of Object.entries(modes)) {

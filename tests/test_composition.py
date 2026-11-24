@@ -41,7 +41,7 @@ def test_views_reference_single_experiment():
     assert plot.panels == ["phase_plane"]
 
 
-@pytest.mark.parametrize('presentation', ['figure', 'bench', 'drawer', 'comparison', 'lesson'])
+@pytest.mark.parametrize('presentation', ['figure', 'bench', 'drawer', 'comparison', 'lesson', 'multiples', 'navigator', 'basin', 'evidence', 'prediction', 'ensemble'])
 def test_experimental_presentations_share_state_and_export(tmp_path, presentation):
     w = PhasePlaneWidget(model_name='fitzhugh_nagumo', params={'I': .5})
     view = w.present(presentation, parameters=['I'])
@@ -54,6 +54,8 @@ def test_experimental_presentations_share_state_and_export(tmp_path, presentatio
     assert 'name="viewport"' in path.read_text()
     assert 'reference_scene' in w.get_state()
     assert w.show_reference is True
+    assert w.initial_conditions == [] and w.observation_cards == []
+    assert 'observation_cards' in w.get_state()
     with pytest.raises(TraitError):
         w.present('invalid')
     with pytest.raises(ValueError, match='Invalid presentation'):

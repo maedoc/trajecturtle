@@ -51,7 +51,7 @@ function mountTimeSeries({ model, controller, document: doc }) {
   });
 }
 
-function mountSweep({ model, controller, document: doc }) {
+function mountSweep({ model, controller, document: doc, navigation = false }) {
   const scope = panelScope(), owner = {}, element = panelElement(doc, 'ppw-sweep', `
     <div class="ppw-sweep-header">Parameter sweep</div>
     <div class="ppw-sweep-controls"><label>Parameter <select class="ppw-sweep-select" aria-label="Sweep parameter"></select></label>
@@ -63,7 +63,33 @@ function mountSweep({ model, controller, document: doc }) {
     <div class="ppw-legend ppw-regime-legend" hidden><span><i style="background:#e3f2fd"></i>Fixed-point regime</span><span><i style="background:#fff3e0"></i>Oscillatory regime</span><span><i style="background:#f5f5f5"></i>Other</span></div>`);
   const select = element.querySelector('select'), min = element.querySelector('.ppw-sweep-min'), max = element.querySelector('.ppw-sweep-max'), count = element.querySelector('.ppw-sweep-n'), run = element.querySelector('.ppw-sweep-btn'), cancel = element.querySelector('.ppw-sweep-cancel');
   let signature;
-  const surface = canvasSurface(element.querySelector('canvas'), scope, (ctx, w, h, theme) => drawSweep(model, ctx, w, h, undefined, undefined, undefined, theme), { width: 700, ratio: 3 / 7, minHeight: 240 });
+  const navigationState = navigation ? (researchSession(model).navigator ||= {}) : {};
+  const fingerprint = parameter => JSON.stringify(RESET_KEYS.map(key => key === 'params' ? Object.entries(model.get('params')).filter(([key]) => key !== parameter) : model.get(key)));
+  const plotted = { get: key => navigation && navigationState.scan ? ({ sweep_results: navigationState.scan.results, sweep_fixed_points: navigationState.scan.points, sweep_param: navigationState.scan.parameter }[key] ?? model.get(key)) : model.get(key) };
+  const canvas = element.querySelector('canvas');
+  const surface = canvasSurface(canvas, scope, (ctx, w, h, theme) => {
+    drawSweep(plotted, ctx, w, h, undefined, undefined, undefined, theme);
+    if (!navigationState.scan) return;
+    const scan = navigationState.scan, low = scan.results[0].param_value, high = scan.results.at(-1).param_value;
+    for (const [value, color] of [[model.get('params')[scan.parameter], theme.cursor], [model.get('reference_metadata')?.params?.[scan.parameter], '#8b929d']]) {
+      if (!Number.isFinite(value) || value < low || value > high || low === high) continue;
+      const x = 35 + (value - low) / (high - low) * (w - 70); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, 35); ctx.lineTo(x, h - 35); ctx.stroke();
+    }
+  }, { width: 700, ratio: 3 / 7, minHeight: 240 });
+  let seek, valueOutput;
+  function chooseValue(value) { const scan = navigationState.scan; if (!scan || model.get('sweep_running')) return;
+    controller.commit({ params: { ...model.get('params'), [scan.parameter]: value } });
+  }
+  if (navigation) {
+    const label = doc.createElement('label'); label.textContent = 'Navigate sampled parameter '; seek = doc.createElement('input'); seek.type = 'range'; seek.className = 'ppw-scan-seek'; seek.setAttribute('aria-label', 'Navigate sampled parameter'); seek.min = 0; seek.step = 1; valueOutput = doc.createElement('output'); label.append(seek, valueOutput); element.append(label);
+    scope.on(seek, 'input', () => chooseValue(navigationState.scan?.results[Number(seek.value)]?.param_value));
+    canvas.tabIndex = 0; canvas.setAttribute('aria-label', 'Sampled bifurcation scan. Click or use left and right arrows to select a sampled parameter value.');
+    scope.on(canvas, 'click', event => { const scan = navigationState.scan; if (!scan) return; const rect = canvas.getBoundingClientRect(), x = (event.clientX - rect.left) * surface.width / rect.width;
+      if (x < 35 || x > surface.width - 35) return;
+      chooseValue(scan.results[Math.round((x - 35) / (surface.width - 70) * (scan.results.length - 1))].param_value);
+    });
+    scope.on(canvas, 'keydown', event => { if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || !navigationState.scan) return; event.preventDefault(); const rows = navigationState.scan.results, index = Math.max(0, Math.min(rows.length - 1, Number(seek.value) + (event.key === 'ArrowRight' ? 1 : -1))); chooseValue(rows[index].param_value); });
+  }
   function bounds() { const info = model.get('param_info')?.[select.value]; if (info) { min.value = info[0]; max.value = info[1]; } }
   scope.on(select, 'change', bounds);
   scope.on(run, 'click', () => controller.startSweep({ parameter: select.value,
@@ -77,13 +103,26 @@ function mountSweep({ model, controller, document: doc }) {
       signature = next; const previous = select.value; select.replaceChildren();
       for (const name of Object.keys(info)) { const option = doc.createElement('option'); option.value = name; option.textContent = name; select.append(option); }
       if (previous in info) select.value = previous; else bounds();
+      if (navigation && navigationState.scan?.parameter in info) {
+        const scan = navigationState.scan; select.value = scan.parameter;
+        min.value = scan.results[0].param_value; max.value = scan.results.at(-1).param_value; count.value = scan.results.length;
+      }
     }
     const running = !!model.get('sweep_running'); run.disabled = running || !select.value; cancel.disabled = !running;
     element.querySelector('.ppw-sweep-status').textContent = controller.sweep.status;
     element.querySelector('.ppw-sweep-progress').classList.toggle('visible', running);
     element.querySelector('.ppw-sweep-progress-bar').style.width = controller.sweep.progress + '%';
     element.querySelector('.ppw-sweep-progress-text').textContent = controller.sweep.progress + '%';
-    const hasResults = !!model.get('sweep_results')?.length;
+    if (navigation) {
+      const rows = model.get('sweep_results') || [], metadata = model.get('sweep_metadata');
+      if (rows.length > 1 && rows.length === metadata?.count && metadata?.identity === sweepIdentity(model) && !running) navigationState.scan = { results: structuredClone(rows), points: structuredClone(model.get('sweep_fixed_points')), parameter: metadata.parameter, fingerprint: fingerprint(metadata.parameter) };
+      if (navigationState.scan && navigationState.scan.fingerprint !== fingerprint(navigationState.scan.parameter)) navigationState.scan = null;
+      const scan = navigationState.scan; seek.disabled = !scan || running; seek.max = Math.max(0, (scan?.results.length || 1) - 1);
+      if (scan) { const current = model.get('params')[scan.parameter]; const index = scan.results.reduce((best, row, i) => Math.abs(row.param_value - current) < Math.abs(scan.results[best].param_value - current) ? i : best, 0); seek.value = index; valueOutput.textContent = `${scan.parameter} = ${Number(current).toPrecision(4)}`;
+        element.querySelector('.ppw-sweep-status').textContent = running || /^(Choose|Sweep failed|Sweep cancelled)/.test(controller.sweep.status) ? controller.sweep.status : `${scan.results.length} samples retained — click the scan or navigate with arrow keys`;
+      } else valueOutput.textContent = 'Run a scan first';
+    }
+    const hasResults = !!plotted.get('sweep_results')?.length;
     element.querySelector('.ppw-sweep-empty').hidden = hasResults;
     element.querySelector('.ppw-regime-legend').hidden = !hasResults;
     element.querySelector('canvas').hidden = !hasResults;

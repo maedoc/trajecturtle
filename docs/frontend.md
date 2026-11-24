@@ -77,7 +77,7 @@ pauses it. Cursor updates redraw linked views without recomputing trajectories.
 
 ## Experimental presentations
 
-The supplementary [View design lab](view-designs.md) exercises five compositions
+The supplementary [View design lab](view-designs.md) exercises eleven compositions
 through `widget.present("figure", parameters=["I"])` and the synced
 `presentation` setting. `explore(...)` creates a notebook-ready experiment with
 `view_switcher=True`; `widget.explore(...)` creates a linked switchable view.
@@ -106,6 +106,30 @@ deleting it. Both phase plane and time series render frozen paths. Different
 models/variable names/projections clear incompatible snapshots. SVG export uses
 the same frozen geometry and clips it to the current axes; the bundled SVG
 adapter has a small dash-array extension for stored paths.
+
+### Scientific-task prototypes
+
+`research-views.js` supplies the shared presentation labels and six new task
+names. Small multiples use detached preview models with no controller or trait
+subscriptions; initial-condition and ensemble paths call the existing simulator
+without writing shared results. Preview horizons are capped at 120 time units,
+with 3 tiles, 6 starts/cards and 2–8 ensemble members. Non-finite paths display
+an explicit divergence error. Hidden/failed tile canvases are cleared.
+
+`initial_conditions` and `observation_cards` are shared, synced Python traits and
+standalone state. Evidence captures deep settings/scene snapshots, supports
+explicit restore and JSON download, and never interpolates user labels as HTML.
+Reset clears both collections, cancels active sweeps and clears scan results.
+Preview options and prediction drafts are held in a WeakMap keyed by presentation
+configuration, so separately configured outputs do not share reveal state. Prediction masks paths/references locally
+and invalidates its reveal when experiment settings change.
+
+`navigator-view.js` reuses phase/time/sweep panels. The navigation-enabled sweep
+stores a completed scan in the frontend session, with an identity excluding only
+the scanned parameter's value. This allows navigation without keeping a stale
+scan after other settings change. Scan clicks, arrow keys and a range control
+commit sampled values to the canonical experiment. The scan is sampled,
+deterministic and slice-based, not a continuation/stability solver.
 
 ## UI and theme tokens
 

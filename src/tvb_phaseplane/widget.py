@@ -72,6 +72,8 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     noise_seed = traitlets.Int(0).tag(sync=True)
     reference_trajectory = traitlets.List([]).tag(sync=True)
     reference_scene = traitlets.Dict({}).tag(sync=True)
+    initial_conditions = traitlets.List([]).tag(sync=True)
+    observation_cards = traitlets.List([]).tag(sync=True)
     show_reference = traitlets.Bool(True).tag(sync=True)
     reference_metadata = traitlets.Dict({}).tag(sync=True)
     trajectory_fraction = traitlets.Float(1.0).tag(sync=True)
@@ -91,7 +93,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     panels = traitlets.List(traitlets.Unicode(), default_value=[]).tag(sync=True)
     visible_parameters = traitlets.List(traitlets.Unicode(), allow_none=True, default_value=None).tag(sync=True)
     panel_layout = traitlets.Enum(["horizontal", "vertical"], default_value="horizontal").tag(sync=True)
-    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson"], default_value="panels").tag(sync=True)
+    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson", "multiples", "navigator", "basin", "evidence", "prediction", "ensemble"], default_value="panels").tag(sync=True)
     view_switcher = traitlets.Bool(False).tag(sync=True)
     sweep_param = traitlets.Unicode("").tag(sync=True)
     experiment_id = traitlets.Unicode("").tag(sync=True)
@@ -216,7 +218,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
                               visible_parameters=parameters, panel_layout=layout)
 
     def explore(self, presentation="figure", *, parameters=None):
-        """Create a linked notebook view with a picker for all five layouts.
+        """Create a linked notebook view with a picker for the experimental layouts.
 
         Layout switches retain experiment state. Leaving a running sweep cancels
         it; parameters, frozen references and completed results are preserved.
@@ -313,6 +315,8 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "noise_seed": self.noise_seed,
             "reference_trajectory": self.reference_trajectory,
             "reference_scene": self.reference_scene,
+            "initial_conditions": self.initial_conditions,
+            "observation_cards": self.observation_cards,
             "show_reference": self.show_reference,
             "reference_metadata": self.reference_metadata,
             "trajectory_fraction": self.trajectory_fraction,
@@ -612,7 +616,7 @@ class ExperimentView(anywidget.AnyWidget):
     _css = PhasePlaneWidget._css
     experiment = traitlets.Instance(PhasePlaneWidget).tag(sync=True, **ipywidgets.widget_serialization)
     view_switcher = traitlets.Bool(False).tag(sync=True)
-    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson"], default_value="panels").tag(sync=True)
+    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson", "multiples", "navigator", "basin", "evidence", "prediction", "ensemble"], default_value="panels").tag(sync=True)
     panels = traitlets.List(traitlets.Unicode()).tag(sync=True)
     visible_parameters = traitlets.List(traitlets.Unicode(), allow_none=True, default_value=None).tag(sync=True)
     panel_layout = traitlets.Enum(["horizontal", "vertical"], default_value="horizontal").tag(sync=True)

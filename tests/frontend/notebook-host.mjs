@@ -12,6 +12,7 @@ import net from 'node:net';
 import { createServer } from 'node:http';
 import { chromium } from 'playwright';
 import { checkDesignGallery } from './design-gallery.mjs';
+import { checkResearchViews } from './research-views.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const directory = await realpath(await mkdtemp(join(tmpdir(), 'trajecturtle-host-')));
@@ -153,6 +154,13 @@ try {
   await notebookDialog.locator('.ppw-close-workspace').click();
   assert.equal(await notebookFigure.locator('.ppw-param-number').inputValue(), '0.65');
   console.log('PASS: notebook explorer picker syncs to Python; figure and expanded bench share live experiment state');
+  if (process.env.TT_SCREENSHOTS) await mkdir(process.env.TT_SCREENSHOTS, { recursive: true });
+  await checkResearchViews(page, {
+    root: page.locator('.ppw-presentation-root'),
+    choose: async value => { await page.locator('.ppw-view-selector').selectOption(value); await page.locator(`[data-presentation=${value}]`).waitFor(); },
+    screenshots: process.env.TT_SCREENSHOTS, prefix: 'notebook-research',
+    afterCapture: async () => { assert.match(await execute('print(len(w.observation_cards), len(w.initial_conditions))'), /1 2/); },
+  });
 
   // Use a plain static server, matching offline/Pages exports. Jupyter's /files
   // handler deliberately sandboxes HTML and disallows download links.
@@ -240,7 +248,18 @@ try {
   }
   assert.match(await page.locator('.ppw-reference-status').textContent(), /retained/);
   assert.equal(await page.locator('.ppw-param-number').inputValue(), '0.5');
-  console.log('PASS: Python explore() export includes a functional five-view picker preserving frozen state');
+  console.log('PASS: Python explore() export includes a functional view picker preserving frozen state');
+  await page.setViewportSize({ width: 1280, height: 960 });
+  await checkResearchViews(page, {
+    root: page.locator('.ppw-presentation-root'),
+    choose: async value => { await page.locator('.ppw-view-selector').selectOption(value); await page.locator(`[data-presentation=${value}]`).waitFor(); },
+    screenshots: process.env.TT_SCREENSHOTS,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const kind of ['multiples', 'navigator', 'basin', 'evidence', 'prediction', 'ensemble']) {
+    await page.locator('.ppw-view-selector').selectOption(kind);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${kind} should not overflow horizontally`);
+  }
   assert.deepEqual(pageErrors, []);
 } catch (error) {
   console.error(log);

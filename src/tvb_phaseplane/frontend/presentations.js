@@ -46,8 +46,8 @@ function mountPresentation(context, kind = context.configuration.get('presentati
       return preferred.length ? preferred.slice(0, 2) : keys.slice(0, 2);
     } };
     for (const name of names) {
-      const factory = name === 'details' ? mountReadout : PANEL_FACTORIES[name];
-      const component = factory({ ...context, configuration });
+      const factory = name === 'details' ? mountReadout : name === 'navigator' ? mountNavigatorView : RESEARCH_KINDS.includes(name) ? context => mountResearchView(context, name) : PANEL_FACTORIES[name];
+      const component = factory({ ...context, configuration, presentationOwner: context.presentationOwner || context.configuration });
       component.element.classList.add('ppw-panel'); component.element.dataset.panel = name;
       if (fit && component.element.querySelector('canvas')) component.element.setAttribute('data-fit-plot', '');
       components.push(component); container.append(component.element);
@@ -157,9 +157,11 @@ function mountPresentation(context, kind = context.configuration.get('presentati
     }
     for (const task of Object.keys(descriptions)) buttons.push(button(task, 'ppw-task-tab', () => choose(task), nav));
     choose(active);
+  } else if (RESEARCH_KINDS.includes(kind)) {
+    group(body, [kind]); group(footer, ['parameters'], { primary: true });
   } else { throw new Error('Unknown presentation: ' + kind); }
   function update() {
-    title.textContent = { figure: 'Interactive figure', bench: 'Experiment bench', drawer: 'Instrument drawer', comparison: 'Comparison lens', lesson: 'Guided lesson' }[kind];
+    title.textContent = PRESENTATION_LABELS[kind];
     badges.textContent = `${(model.get('model_name') || '').replaceAll('_', ' ')}${model.get('noise_enable') ? ' · noise on' : ''}${model.get('reference_trajectory')?.length ? ' · frozen reference' : ''}${model.get('sweep_running') ? ' · sweep running' : ''}`;
     error.textContent = controller.error?.message || ''; error.hidden = !controller.error;
     for (const instance of [...groups]) instance.update();

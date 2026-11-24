@@ -317,6 +317,136 @@ test('notebook view picker syncs presentation, retains state/focus and cleans li
   assert.equal(m.listenerCount(), 0);
 });
 
+test('all six scientific-task layouts use isolated previews and clean up listeners', async () => {
+  for (const presentation of ['multiples', 'navigator', 'basin', 'evidence', 'prediction', 'ensemble']) {
+    const m = model({ presentation, view_switcher: true, visible_parameters: ['I'] });
+    computeExperiment(m); const trajectory = m.get('trajectory'), params = m.get('params');
+    const el = await mount(m);
+    assert.equal(el.querySelector('[data-presentation]').dataset.presentation, presentation);
+    assert.equal(m.get('trajectory'), trajectory);
+    assert.equal(m.get('params'), params);
+    assert.equal(m.get('noise_enable'), false);
+    for (const dispose of disposers.splice(0)) dispose();
+    assert.equal(m.listenerCount(), 0);
+  }
+});
+
+test('small multiples validate tile bounds and change live parameters only on Use', async () => {
+  const m = model({ presentation: 'multiples', visible_parameters: ['I'] }), el = await mount(m);
+  assert.equal(el.querySelectorAll('canvas').length, 3);
+  const input = el.querySelectorAll('.ppw-multiple-value')[2];
+  input.value = '.9'; input.dispatchEvent(new window.Event('change'));
+  assert.equal(m.get('params').I, .5);
+  el.querySelectorAll('.ppw-use-tile')[2].click(); assert.equal(m.get('params').I, .9);
+  input.value = '10'; input.dispatchEvent(new window.Event('change'));
+  assert.equal(input.getAttribute('aria-invalid'), 'true'); assert.equal(m.get('params').I, .9);
+});
+
+test('initial-condition collection survives layout changes, filters projections and resets', async () => {
+  const m = model({ presentation: 'basin' }), el = await mount(m);
+  el.querySelector('.ppw-add-start').click();
+  m.set('x0', .4); await pause(); el.querySelector('.ppw-add-start').click();
+  assert.equal(m.get('initial_conditions').length, 2);
+  m.set('presentation', 'figure'); m.set('presentation', 'basin');
+  assert.equal(el.querySelectorAll('.ppw-trace-list button').length, 2);
+  m.set('display', [1, 0]); await pause(); assert.equal(el.querySelectorAll('.ppw-trace-list button').length, 0);
+  m.set('display', [0, 1]); await pause(); assert.equal(el.querySelectorAll('.ppw-trace-list button').length, 2);
+  el.querySelector('.ppw-stage-reset').click(); assert.deepEqual(m.get('initial_conditions'), []);
+});
+
+test('evidence stores deep snapshots, previews safely and restores explicitly', async () => {
+  const m = model({ presentation: 'evidence' }), el = await mount(m);
+  el.querySelector('[aria-label="Observation label"]').value = '<b>first</b>';
+  el.querySelector('.ppw-capture-observation').click();
+  const card = m.get('observation_cards')[0]; assert.equal(card.state.params.I, .5);
+  assert.notEqual(card.scene.trajectory, m.get('trajectory'));
+  assert.equal(el.querySelector('.ppw-evidence-cards b'), null);
+  m.set('params', { ...m.get('params'), I: .8 }); await pause();
+  el.querySelector('.ppw-evidence-cards button').click(); assert.equal(m.get('params').I, .8);
+  m.set('presentation', 'figure'); m.set('presentation', 'evidence');
+  el.querySelector('.ppw-restore-observation').click(); assert.equal(m.get('params').I, .5);
+  assert.equal(m.get('observation_cards').length, 1);
+  el.querySelector('.ppw-stage-reset').click(); assert.deepEqual(m.get('observation_cards'), []);
+});
+
+test('prediction reveal is local, survives layout switches and hides again on changed experiment', async () => {
+  const m = model({ presentation: 'prediction' }), el = await mount(m);
+  const answer = el.querySelector('.ppw-prediction-answer'); answer.value = 'A stable resting state'; answer.dispatchEvent(new window.Event('input'));
+  el.querySelector('.ppw-reveal').click(); assert.equal(el.querySelector('.ppw-reveal').getAttribute('aria-pressed'), 'true');
+  assert.equal(m.get('show_trajectory'), true);
+  m.set('presentation', 'figure'); m.set('presentation', 'prediction');
+  assert.equal(el.querySelector('.ppw-prediction-answer').value, 'A stable resting state');
+  m.set('params', { ...m.get('params'), I: .1 }); await pause();
+  assert.equal(el.querySelector('.ppw-reveal').getAttribute('aria-pressed'), 'false');
+  assert.equal(el.querySelector('.ppw-prediction-answer').value, '');
+});
+
+test('prediction drafts/reveal remain independent across separately configured outputs', async () => {
+  const m = model(), config = () => ({ get: key => key === 'presentation' ? 'prediction' : undefined });
+  const first = await mount(m, config()), second = await mount(m, config());
+  first.querySelector('.ppw-reveal').click();
+  m.set('trajectory_fraction', .5);
+  assert.equal(first.querySelector('.ppw-reveal').getAttribute('aria-pressed'), 'true');
+  assert.equal(second.querySelector('.ppw-reveal').getAttribute('aria-pressed'), 'false');
+  first.querySelector('.ppw-stage-reset').click();
+  assert.equal(first.querySelector('.ppw-reveal').getAttribute('aria-pressed'), 'false');
+});
+
+test('ensemble previews leave live noise unchanged until a seed is explicitly applied', async () => {
+  const m = model({ presentation: 'ensemble' }), el = await mount(m);
+  assert.equal(el.querySelectorAll('.ppw-use-member').length, 4);
+  assert.equal(m.get('noise_enable'), false);
+  const count = el.querySelector('.ppw-ensemble-count'); count.value = '20'; count.dispatchEvent(new window.Event('change'));
+  assert.match(el.querySelector('.ppw-research-status').textContent, /2–8/);
+  el.querySelectorAll('.ppw-use-member')[1].click();
+  assert.equal(m.get('noise_seed'), 1); assert.equal(m.get('noise_enable'), true);
+  assert.equal(m.get('integrator'), 'heun'); assert.deepEqual(m.get('noise_sigma'), [.1, .1]);
+});
+
+test('navigator retains a completed scan when selecting its parameter, invalidates other changes', async () => {
+  const m = model({ presentation: 'navigator' }), el = await mount(m);
+  const select = el.querySelector('.ppw-sweep-select'); select.value = 'I'; select.dispatchEvent(new window.Event('change'));
+  el.querySelector('.ppw-sweep-min').value = '0'; el.querySelector('.ppw-sweep-max').value = '1';
+  el.querySelector('.ppw-sweep-n').value = '4'; el.querySelector('.ppw-sweep-btn').click(); await pause(400);
+  const seek = el.querySelector('.ppw-scan-seek'); assert.equal(seek.disabled, false);
+  seek.value = '1'; seek.dispatchEvent(new window.Event('input'));
+  assert.equal(m.get('params').I, 1 / 3); assert.equal(seek.disabled, false);
+  assert.equal(el.querySelector('.ppw-sweep-canvas').hidden, false);
+  m.set('presentation', 'figure'); m.set('presentation', 'navigator');
+  assert.equal(el.querySelector('.ppw-scan-seek').disabled, false);
+  m.set('x0', .6); await pause(); assert.equal(el.querySelector('.ppw-scan-seek').disabled, true);
+  el.querySelector('.ppw-stage-reset').click();
+  sweep(el, 4); await pause(400);
+  assert.equal(el.querySelector('.ppw-scan-seek').disabled, false);
+  el.querySelector('.ppw-stage-reset').click();
+  assert.equal(el.querySelector('.ppw-scan-seek').disabled, true);
+  sweep(el, 100); assert.equal(m.get('sweep_running'), true);
+  el.querySelector('.ppw-stage-reset').click();
+  assert.equal(m.get('sweep_running'), false);
+  assert.deepEqual(m.get('sweep_results'), []);
+});
+
+test('parameter-free 3D custom experiments have safe empty multiples and projected trajectories', async () => {
+  const spec = { state_vars: { x: { range: [-1, 1] }, y: { range: [-1, 1] }, z: { range: [-1, 1] } }, equations: { x: '-x', y: '-y', z: '-z' }, parameters: {} };
+  const m = model({ model_name: 'custom', model_spec: spec, params: {}, param_info: {}, state_names: ['x', 'y', 'z'], display: [2, 0], clamped: [0, .5, 0], presentation: 'multiples' });
+  const el = await mount(m);
+  assert.match(el.querySelector('.ppw-research-status').textContent, /no parameters/);
+  assert.equal(el.querySelector('.ppw-use-tile').disabled, true);
+  m.set('presentation', 'figure'); m.set('presentation', 'multiples');
+  assert.match(el.querySelector('.ppw-research-status').textContent, /no parameters/);
+  m.set('presentation', 'basin'); el.querySelector('.ppw-add-start').click();
+  assert.equal(m.get('initial_conditions').length, 1);
+  assert.equal(el.querySelector('.ppw-research-status').textContent, '');
+  m.set('presentation', 'ensemble'); assert.equal(el.querySelector('.ppw-research-status').textContent, '');
+});
+
+test('truncated divergent preview paths are reported rather than presented as complete', async () => {
+  const spec = { state_vars: { x: { range: [-1, 1] }, y: { range: [-1, 1] } }, equations: { x: 'x*x*x', y: '-y' }, parameters: {} };
+  const m = model({ model_name: 'custom', model_spec: spec, params: {}, param_info: {}, state_names: ['x', 'y'], x0: 10, presentation: 'ensemble' });
+  const el = await mount(m);
+  assert.match(el.querySelector('.ppw-research-status').textContent, /diverged/);
+});
+
 test('view picker works in static per-view configurations without a mutable model proxy', async () => {
   const m = model(), options = { get: key => ({ presentation: 'figure', view_switcher: true, visible_parameters: ['I'] })[key] };
   const el = await mount(m, options);

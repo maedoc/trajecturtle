@@ -19,7 +19,7 @@ __version__ = "0.1.0"
 
 
 def explore(model_name="fitzhugh_nagumo", *, parameters=None, presentation="figure", **kwargs):
-    """Create a notebook widget with a picker for five experimental layouts.
+    """Create a notebook widget with a picker for eleven experimental layouts.
 
     Parameters
     ----------
@@ -28,7 +28,8 @@ def explore(model_name="fitzhugh_nagumo", *, parameters=None, presentation="figu
     parameters : list[str] or None
         Primary slider names, in display order. None selects model defaults.
     presentation : str
-        Starting layout: figure, bench, drawer, comparison or lesson.
+        Starting layout: figure, bench, drawer, comparison, lesson, multiples,
+        navigator, basin, evidence, prediction or ensemble.
     **kwargs
         Experiment settings passed to PhasePlaneWidget, e.g. params, t_max,
         x0, y0 or model_spec. The returned widget can also export static HTML.

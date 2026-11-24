@@ -1,7 +1,7 @@
 // One controller per canonical experiment model, independent of mounted panels.
 const EXPERIMENT_CONTROLLER = Symbol.for('trajecturtle.experiment-controller');
 const COMPUTATION_INPUTS = ['model_spec', 'model_name', 'params', 'state_names', 'display', 'clamped', 'x0', 'y0', 'xlim', 'ylim', 't_max', 'integrator', 'noise_enable', 'noise_sigma', 'noise_seed'];
-const PRESENTATION_INPUTS = ['param_info', 'show_nullclines', 'show_vector_field', 'show_trajectory', 'show_fixed_points', 'trajectory_fraction', 'reference_trajectory', 'reference_scene', 'show_reference', 'reference_metadata', 'sweep_results', 'sweep_fixed_points', 'sweep_param'];
+const PRESENTATION_INPUTS = ['param_info', 'show_nullclines', 'show_vector_field', 'show_trajectory', 'show_fixed_points', 'trajectory_fraction', 'reference_trajectory', 'reference_scene', 'show_reference', 'reference_metadata', 'sweep_results', 'sweep_fixed_points', 'sweep_param', 'initial_conditions', 'observation_cards'];
 
 export function acquireExperiment(model) {
   const controller = model[EXPERIMENT_CONTROLLER] ||= createExperimentController(model);
@@ -60,7 +60,8 @@ function createExperimentController(model) {
       emit(); sync();
     },
     reset() {
-      controller.pause();
+      controller.pause(); controller.cancelSweep();
+      controller.sweep = { progress: 0, status: '' };
       resetExperiment(model);
       controller.refresh();
     },

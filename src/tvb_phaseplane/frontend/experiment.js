@@ -14,6 +14,11 @@ export function resetExperiment(model) {
   model.set('reference_scene', {});
   model.set('reference_metadata', {});
   model.set('trajectory_fraction', 1);
+  model.set('initial_conditions', []); model.set('observation_cards', []);
+  model.set('sweep_results', []); model.set('sweep_fixed_points', []); model.set('sweep_metadata', {});
+  const research = experimentSession(model).research ||= {};
+  research.revision = (research.revision || 0) + 1;
+  if (research.navigator) research.navigator.scan = null;
 }
 
 export function referenceIdentity(model) {

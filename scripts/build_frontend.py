@@ -9,7 +9,7 @@ import argparse
 ROOT = Path(__file__).resolve().parents[1] / "src/tvb_phaseplane"
 SOURCES = (
     "vendor", "drawing-support", "engine", "coordinates", "experiment", "controller",
-    "components", "plot-drawing", "control-panels", "plot-panels", "editor-panel", "presentations", "view",
+    "components", "plot-drawing", "control-panels", "plot-panels", "editor-panel", "research-views", "navigator-view", "presentations", "view",
 )
 
 

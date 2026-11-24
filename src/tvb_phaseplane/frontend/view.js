@@ -72,7 +72,7 @@ function mountConfigured(model, el, configuration) {
       const scope = panelScope(), picker = panelElement(doc, 'ppw-view-picker');
       const label = doc.createElement('label'); label.append(doc.createTextNode('View '));
       const select = doc.createElement('select'); select.className = 'ppw-view-selector'; select.setAttribute('aria-label', 'View layout'); label.append(select);
-      const choices = { figure: 'Interactive figure', bench: '16:9 experiment bench', drawer: 'Instrument drawer', comparison: 'Comparison lens', lesson: 'Guided lesson' };
+      const choices = { ...PRESENTATION_LABELS };
       if (presentation === 'panels') choices.panels = 'All panels';
       for (const [value, text] of Object.entries(choices)) { const option = doc.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
       select.value = presentation; picker.append(label);
