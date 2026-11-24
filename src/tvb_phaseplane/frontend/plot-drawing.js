@@ -328,6 +328,16 @@ function _resolveBifurcationObs(model) {
   return { obsKey: idx, obsLabel: stateNames[idx] || ('u' + idx) };
 }
 
+const TWO_D_STYLES = {
+  LP2:  { key: 'LP2',  strokeStyle: '#245c9b', dash: [],            lineWidth: 2, label: 'Fold (LP2)' },
+  HB2:  { key: 'HB2',  strokeStyle: '#c62828', dash: [],            lineWidth: 2, label: 'Hopf (HB2)' },
+  LPC2: { key: 'LPC2', strokeStyle: '#2e7d32', dash: [6, 4],        lineWidth: 2, label: 'LC Fold (LPC2)' },
+  PD2:  { key: 'PD2',  strokeStyle: '#e65100', dash: [],            lineWidth: 2, label: 'Period Doubling (PD2)' },
+  TR2:  { key: 'TR2',  strokeStyle: '#00838f', dash: [3, 3],        lineWidth: 2, label: 'Torus (TR2)' },
+  HOM2: { key: 'HOM2', strokeStyle: '#6a1b9a', dash: [8, 3, 2, 3],  lineWidth: 2, label: 'Homoclinic (HOM2)' },
+};
+const TWO_D_BRANCH_TYPES = new Set(Object.keys(TWO_D_STYLES));
+
 function _padBounds(min, max, frac = 0.05) {
   if (!Number.isFinite(min) || !Number.isFinite(max)) return [-1, 1];
   if (min === max) return [min - 0.5, max + 0.5];
@@ -335,10 +345,47 @@ function _padBounds(min, max, frac = 0.05) {
   return [min - margin, max + margin];
 }
 
+function _resolveAxisBounds(min, max, frac, override) {
+  const auto = _padBounds(min, max, frac);
+  if (!Array.isArray(override) || override.length !== 2) return auto;
+  const lo = override[0] !== null && override[0] !== '' && Number.isFinite(Number(override[0])) ? Number(override[0]) : auto[0];
+  const hi = override[1] !== null && override[1] !== '' && Number.isFinite(Number(override[1])) ? Number(override[1]) : auto[1];
+  return lo < hi ? [lo, hi] : auto;
+}
+
+function bifurcation2DPlanes(branches) {
+  const seen = new Set();
+  const planes = [];
+  for (const br of branches || []) {
+    if (!br || !TWO_D_BRANCH_TYPES.has(br.type) || !br.param1 || !br.param2) continue;
+    const key = JSON.stringify([br.param1, br.param2]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    planes.push({ key, param1: br.param1, param2: br.param2 });
+  }
+  return planes;
+}
+
+function _parsePlaneSelection(raw) {
+  if (!raw) return null;
+  if (Array.isArray(raw) && raw.length === 2 && raw[0] && raw[1]) return JSON.stringify([raw[0], raw[1]]);
+  if (typeof raw === 'string') {
+    if (raw.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length === 2) return JSON.stringify([parsed[0], parsed[1]]);
+      } catch {}
+    }
+    const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length === 2) return JSON.stringify(parts);
+  }
+  return null;
+}
+
 function bifurcation1DBounds(model) {
   const cfg = model.get('bifurcation_config') || {};
   const branches = (model.get('bifurcation_branches') || []).filter(b => b && (b.type === 'EP' || b.type === 'LC'));
-  const sps = (model.get('bifurcation_special_points') || []).filter(sp => sp && sp.ty !== 'CP' && sp.ty !== 'BT' && sp.ty !== 'GH' && !sp.param2);
+  const sps = (model.get('bifurcation_special_points') || []).filter(sp => sp && sp.ty !== 'CP' && sp.ty !== 'BT' && sp.ty !== 'GH' && sp.ty !== 'ZH' && !sp.param2);
   const meta = model.get('bifurcation_metadata') || {};
   const param1 = cfg.param1 || branches[0]?.param1 || meta.active_params?.[0] || Object.keys(model.get('params') || {})[0] || 'p';
   const { obsKey, obsLabel } = _resolveBifurcationObs(model);
@@ -361,20 +408,33 @@ function bifurcation1DBounds(model) {
     includeY(bifurcationObservableValue(sp, obsKey, 'u'));
   }
   return {
-    xlim: _padBounds(pMin, pMax, 0.05),
-    ylim: _padBounds(yMin, yMax, 0.1),
+    xlim: _resolveAxisBounds(pMin, pMax, 0.05, cfg.xlim1d),
+    ylim: _resolveAxisBounds(yMin, yMax, 0.1, cfg.ylim1d),
+    autoXlim: _padBounds(pMin, pMax, 0.05),
+    autoYlim: _padBounds(yMin, yMax, 0.1),
     param1, obsKey, obsLabel, branches, specialPoints: sps,
   };
 }
 
 function bifurcation2DBounds(model) {
   const cfg = model.get('bifurcation_config') || {};
-  const branches = (model.get('bifurcation_branches') || []).filter(b => b && (b.type === 'LP2' || b.type === 'HB2'));
-  const branchIds = new Set(branches.map(b => b.id));
-  const sps = (model.get('bifurcation_special_points') || []).filter(sp => sp && (branchIds.has(sp.branch_id) || Number.isFinite(sp.p2) || sp.ty === 'CP' || sp.ty === 'BT' || sp.ty === 'GH'));
+  const all2D = (model.get('bifurcation_branches') || []).filter(b => b && TWO_D_BRANCH_TYPES.has(b.type));
+  const planes = bifurcation2DPlanes(all2D);
+  const requestedKey = _parsePlaneSelection(cfg.plane2d);
+  const activePlane = (requestedKey && planes.find(pl => pl.key === requestedKey)) || planes[planes.length - 1] || null;
   const paramNames = Object.keys(model.get('params') || {});
-  const param1 = branches[0]?.param1 || cfg.param1 || paramNames[0] || 'p1';
-  const param2 = branches[0]?.param2 || cfg.param2 || paramNames.find(k => k !== param1) || 'p2';
+  const param1 = activePlane?.param1 || cfg.param1 || paramNames[0] || 'p1';
+  const param2 = activePlane?.param2 || cfg.param2 || paramNames.find(k => k !== param1) || 'p2';
+  const branches = activePlane
+    ? all2D.filter(b => b.param1 === param1 && b.param2 === param2)
+    : all2D;
+  const branchIds = new Set(branches.map(b => b.id));
+  const sps = (model.get('bifurcation_special_points') || []).filter(sp => {
+    if (!sp) return false;
+    if (sp.branch_id && !branchIds.has(sp.branch_id)) return false;
+    if (sp.param1 && sp.param2 && (sp.param1 !== param1 || sp.param2 !== param2)) return false;
+    return branchIds.has(sp.branch_id) || Number.isFinite(sp.p2) || sp.ty === 'CP' || sp.ty === 'BT' || sp.ty === 'GH' || sp.ty === 'ZH';
+  });
   let p1Min = Infinity, p1Max = -Infinity, p2Min = Infinity, p2Max = -Infinity;
   for (const br of branches) {
     for (const pt of br.points || []) {
@@ -387,9 +447,11 @@ function bifurcation2DBounds(model) {
     if (Number.isFinite(sp.p2)) { p2Min = Math.min(p2Min, sp.p2); p2Max = Math.max(p2Max, sp.p2); }
   }
   return {
-    xlim: _padBounds(p1Min, p1Max, 0.05),
-    ylim: _padBounds(p2Min, p2Max, 0.05),
-    param1, param2, branches, specialPoints: sps,
+    xlim: _resolveAxisBounds(p1Min, p1Max, 0.05, cfg.xlim2d),
+    ylim: _resolveAxisBounds(p2Min, p2Max, 0.05, cfg.ylim2d),
+    autoXlim: _padBounds(p1Min, p1Max, 0.05),
+    autoYlim: _padBounds(p2Min, p2Max, 0.05),
+    param1, param2, branches, specialPoints: sps, planes,
   };
 }
 
@@ -468,6 +530,11 @@ function _drawSpecialPointMarker(ctx, sx, sy, sp, theme) {
   } else if (ty === 'BP' || ty === 'CP') {
     ctx.strokeStyle = '#6a1b9a';
     ctx.beginPath(); ctx.arc(sx, sy, r - 0.5, 0, 2 * Math.PI); ctx.stroke();
+  } else if (ty === 'ZH') {
+    ctx.strokeStyle = '#00695c';
+    ctx.beginPath();
+    ctx.rect(sx - r + 1, sy - r + 1, 2 * r - 2, 2 * r - 2);
+    ctx.stroke();
   } else {
     ctx.fillStyle = theme.text || DEFAULT_PLOT_THEME.text;
     ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 2 * Math.PI); ctx.fill();
@@ -565,9 +632,9 @@ export function drawBifurcation2D(model, ctx, w, h, theme = DEFAULT_PLOT_THEME) 
   ctx.clip();
 
   for (const br of branches) {
-    const color = br.type === 'HB2' ? '#c62828' : '#245c9b';
+    const style = TWO_D_STYLES[br.type] || TWO_D_STYLES.LP2;
     _drawStyledCurve(ctx, br.points, xlim, ylim, w, h,
-      pt => [pt.p, pt.p2], () => ({ key: br.type, strokeStyle: color, dash: [], lineWidth: 2 }));
+      pt => [pt.p, pt.p2], () => style);
   }
 
   for (const sp of specialPoints) {
@@ -590,6 +657,40 @@ export function drawBifurcation2D(model, ctx, w, h, theme = DEFAULT_PLOT_THEME) 
       ctx.beginPath(); ctx.moveTo(42, sy); ctx.lineTo(w - 42, sy); ctx.stroke();
     }
     ctx.setLineDash([]);
+  }
+
+  // Compact in-canvas legend for plotted 2D curve types (also appears in SVG export).
+  const activeTypes = [...new Set(branches.map(b => b.type).filter(t => TWO_D_STYLES[t]))];
+  if (activeTypes.length > 0 && w >= 220 && h >= 140) {
+    const boxW = 148, rowH = 15, boxH = 8 + activeTypes.length * rowH;
+    const bx = w - 48 - boxW, by = 48;
+    ctx.save();
+    ctx.globalAlpha = 0.88;
+    ctx.fillStyle = bg;
+    ctx.fillRect(bx, by, boxW, boxH);
+    ctx.restore();
+    ctx.strokeStyle = theme.grid || '#dce3eb';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.rect(bx, by, boxW, boxH);
+    ctx.stroke();
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    activeTypes.forEach((ty, idx) => {
+      const style = TWO_D_STYLES[ty];
+      const ry = by + 6 + idx * rowH + rowH / 2 - 2;
+      ctx.strokeStyle = style.strokeStyle;
+      ctx.lineWidth = style.lineWidth;
+      ctx.setLineDash(style.dash);
+      ctx.beginPath();
+      ctx.moveTo(bx + 8, ry);
+      ctx.lineTo(bx + 26, ry);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = theme.text || DEFAULT_PLOT_THEME.text;
+      ctx.fillText(style.label, bx + 32, ry);
+    });
   }
   ctx.restore();
 }

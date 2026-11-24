@@ -98,6 +98,18 @@ function _nextBranchId(prefix, existingBranches) {
   return `${prefix}_${maxNum + 1}`;
 }
 
+function _clipRayByParam2(points, rl2Min, rl2Max) {
+  if (!Number.isFinite(rl2Min) && !Number.isFinite(rl2Max)) return points || [];
+  const lo = Number.isFinite(rl2Min) ? rl2Min : -Infinity;
+  const hi = Number.isFinite(rl2Max) ? rl2Max : Infinity;
+  const out = [];
+  for (const pt of points || []) {
+    if (Number.isFinite(pt?.p2) && (pt.p2 < lo || pt.p2 > hi)) break;
+    out.push(pt);
+  }
+  return out;
+}
+
 function _registerSpecialPoints(rawSpecialPoints, branchId, param1, param2, existingSps, restartCache) {
   const counts = {};
   for (const sp of existingSps || []) {
@@ -105,9 +117,13 @@ function _registerSpecialPoints(rawSpecialPoints, branchId, param1, param2, exis
   }
   const added = [];
   for (const sp of rawSpecialPoints || []) {
-    if (!sp || !sp.ty || sp.ty === 'EP' || sp.ty === 'UZ') continue;
+    if (!sp || !sp.ty || ((sp.ty === 'EP' || sp.ty === 'UZ') && !sp.can_trace_homoclinic)) continue;
     counts[sp.ty] = (counts[sp.ty] || 0) + 1;
     const id = `${sp.ty}${counts[sp.ty]}`;
+    const canTrace2D = Boolean(
+      sp.can_trace_2d || sp.ty === 'LP' || sp.ty === 'HB' || sp.ty === 'LPC' || sp.ty === 'PD' || sp.ty === 'TR',
+    );
+    const canTraceHomoclinic = Boolean(sp.can_trace_homoclinic);
     const entry = {
       id,
       label: id,
@@ -119,7 +135,8 @@ function _registerSpecialPoints(rawSpecialPoints, branchId, param1, param2, exis
       param1,
       param2: param2 ?? null,
       can_switch_lc: sp.ty === 'HB',
-      can_trace_2d: sp.ty === 'LP' || sp.ty === 'HB',
+      can_trace_2d: canTrace2D,
+      ...(canTraceHomoclinic ? { can_trace_homoclinic: true } : {}),
       ...(sp.period !== undefined ? { period: sp.period } : {}),
       ...(sp.p2 !== undefined ? { p2: sp.p2 } : {}),
     };
@@ -134,6 +151,7 @@ function _registerSpecialPoints(rawSpecialPoints, branchId, param1, param2, exis
       param1,
       param2: param2 ?? null,
       branch_id: branchId,
+      can_trace_homoclinic: canTraceHomoclinic,
       restartSp: sp.restartSp || null,
     });
   }
@@ -512,6 +530,9 @@ function createExperimentController(model) {
             ncol: cfg.ncol ?? 4,
             ilp: cfg.ilp ?? 1,
             isp: cfg.isp ?? 2,
+            ...(cfg.stopPeriod !== undefined && cfg.stopPeriod !== null && Number.isFinite(Number(cfg.stopPeriod))
+              ? { stopPeriod: Number(cfg.stopPeriod) }
+              : {}),
           },
         });
         if (!_isBifurcationJobActive(job)) return null;
@@ -555,8 +576,14 @@ function createExperimentController(model) {
       const modelIdentity = _bifurcationModelIdentity(model);
       const job = _beginBifurcationJob(owner, modelIdentity);
       try {
-        if (!entry || (entry.ty !== 'LP' && entry.ty !== 'HB')) {
-          return _failBifurcationJob(job, `Two-parameter continuation requires an LP or HB point (got ${entry?.ty || 'none'})`);
+        const isHomoclinic = Boolean(config.homoclinic || entry?.can_trace_homoclinic) && Boolean(entry?.restartSp?.ups);
+        const isLcBif = entry && (entry.ty === 'LPC' || entry.ty === 'PD' || entry.ty === 'TR');
+        const isEpBif = entry && (entry.ty === 'LP' || entry.ty === 'HB');
+        if (!entry || (!isEpBif && !isLcBif && !isHomoclinic)) {
+          return _failBifurcationJob(
+            job,
+            `Two-parameter continuation requires an LP, HB, LPC, PD, TR, or homoclinic LC point (got ${entry?.ty || 'none'})`,
+          );
         }
         const modelName = model.get('model_name');
         const modelSpec = model.get('model_spec');
@@ -568,21 +595,33 @@ function createExperimentController(model) {
           return _failBifurcationJob(job, 'Choose a second parameter distinct from the primary parameter');
         }
         const [rl0, rl1] = _resolveBifurcationRange(def, model, param1, cfg.range, cfg.rl0, cfg.rl1, params[param1]);
+        let rl2Min = NaN, rl2Max = NaN;
+        if (Array.isArray(cfg.range2) && cfg.range2.length === 2 && Number.isFinite(cfg.range2[0]) && Number.isFinite(cfg.range2[1])) {
+          rl2Min = Math.min(cfg.range2[0], cfg.range2[1]);
+          rl2Max = Math.max(cfg.range2[0], cfg.range2[1]);
+        } else {
+          if (cfg.rl2_0 !== undefined && cfg.rl2_0 !== null && Number.isFinite(Number(cfg.rl2_0))) rl2Min = Number(cfg.rl2_0);
+          if (cfg.rl2_1 !== undefined && cfg.rl2_1 !== null && Number.isFinite(Number(cfg.rl2_1))) rl2Max = Number(cfg.rl2_1);
+          if (Number.isFinite(rl2Min) && Number.isFinite(rl2Max) && rl2Min > rl2Max) [rl2Min, rl2Max] = [rl2Max, rl2Min];
+        }
         const absDs = Math.abs(cfg.ds ?? 0.05) || 0.05;
+        const useLC = isLcBif || isHomoclinic;
         const contBase = {
-          ips: 1,
+          ips: useLC ? 2 : 1,
           isw: 2,
           irs: entry.lab,
           restartSp: entry.restartSp || entry,
           activeParams: [param1, param2],
+          ...(useLC ? { icp: [0, 1] } : {}),
           rl0,
           rl1,
           dsmin: cfg.dsmin ?? 1e-4,
           dsmax: cfg.dsmax ?? 0.2,
           nmx: cfg.nmx ?? 200,
           npr: cfg.npr ?? 200,
-          ilp: cfg.ilp ?? 1,
-          isp: cfg.isp ?? 2,
+          ...(useLC ? { ntst: cfg.ntst ?? entry.restartSp?.ntst ?? 50, ncol: cfg.ncol ?? entry.restartSp?.ncol ?? 4 } : {}),
+          ilp: isHomoclinic ? 0 : (cfg.ilp ?? 1),
+          isp: isHomoclinic ? 0 : (cfg.isp ?? 2),
         };
         const modelPayload = { model_name: modelName, model_spec: modelSpec, params };
         const client = _getAutoClient();
@@ -601,9 +640,13 @@ function createExperimentController(model) {
 
         const existingBranches = model.get('bifurcation_branches') || [];
         const existingSps = model.get('bifurcation_special_points') || [];
-        const branchType = entry.ty === 'LP' ? 'LP2' : 'HB2';
+        const branchType = isHomoclinic
+          ? 'HOM2'
+          : ({ LP: 'LP2', HB: 'HB2', LPC: 'LPC2', PD: 'PD2', TR: 'TR2' }[entry.ty] || 'LP2');
         const branchId = _nextBranchId(branchType.toLowerCase(), existingBranches);
-        const stitchedPoints = _stitchBidirectionalBranch(bwdRes.branch, fwdRes.branch);
+        const fwdPts = _clipRayByParam2(fwdRes.branch, rl2Min, rl2Max);
+        const bwdPts = _clipRayByParam2(bwdRes.branch, rl2Min, rl2Max);
+        const stitchedPoints = _stitchBidirectionalBranch(bwdPts, fwdPts);
         const branch = {
           id: branchId,
           type: branchType,
@@ -612,7 +655,12 @@ function createExperimentController(model) {
           source_sp_id: specialPointId,
           points: stitchedPoints,
         };
-        const rawSps = [...(bwdRes.specialPoints || []), ...(fwdRes.specialPoints || [])];
+        const rawSps = [...(bwdRes.specialPoints || []), ...(fwdRes.specialPoints || [])].filter((sp) => {
+          if (!Number.isFinite(sp?.p2)) return true;
+          if (Number.isFinite(rl2Min) && sp.p2 < rl2Min) return false;
+          if (Number.isFinite(rl2Max) && sp.p2 > rl2Max) return false;
+          return true;
+        });
         const addedSps = _registerSpecialPoints(rawSps, branchId, param1, param2, existingSps, controller.restartCache);
 
         const prevMeta = model.get('bifurcation_metadata') || {};
@@ -648,6 +696,9 @@ function createExperimentController(model) {
         ...(preset.range ? { range: preset.range } : {}),
         ...(preset.param2 ? { param2: preset.param2 } : {}),
         ...(preset.range2 ? { range2: preset.range2 } : {}),
+        ...(preset.xlim2d ? { xlim2d: preset.xlim2d } : {}),
+        ...(preset.ylim2d ? { ylim2d: preset.ylim2d } : {}),
+        ...(preset.stop_period !== undefined ? { stopPeriod: preset.stop_period } : {}),
       });
       emit(); sync();
 
@@ -658,12 +709,16 @@ function createExperimentController(model) {
       if (!epRes || disposed) return null;
 
       let lcRes = null;
-      if (preset.auto_switch_lc) {
+      if (preset.auto_switch_lc || preset.auto_trace_homoclinic) {
         const hb = (epRes.specialPoints || []).find((sp) => sp.ty === 'HB');
         if (hb) {
           lcRes = await controller.switchToLimitCycle(
             hb.id,
-            { param1: preset.param1, range: preset.range },
+            {
+              param1: preset.param1,
+              range: preset.range,
+              ...(preset.stop_period !== undefined ? { stopPeriod: preset.stop_period } : {}),
+            },
             owner,
           );
           if (!lcRes || disposed) return { ep: epRes, lc: lcRes, twoParam: null };
@@ -672,14 +727,40 @@ function createExperimentController(model) {
 
       let twoParamRes = null;
       if (preset.auto_trace_2d && preset.param2) {
-        const sp2d = (epRes.specialPoints || []).find((sp) => sp.ty === 'LP' || sp.ty === 'HB');
-        if (sp2d) {
-          twoParamRes = await controller.startTwoParamContinuation(
-            sp2d.id,
-            preset.param2,
-            { range: preset.range, range2: preset.range2 },
-            owner,
-          );
+        const twoDConfig = { range: preset.range, range2: preset.range2 };
+        if (preset.auto_trace_2d === 'all') {
+          const targets = [];
+          const firstLP = (epRes.specialPoints || []).find((sp) => sp.ty === 'LP');
+          const firstHB = (epRes.specialPoints || []).find((sp) => sp.ty === 'HB');
+          if (firstLP) targets.push(firstLP);
+          if (firstHB) targets.push(firstHB);
+          for (const sp of targets) {
+            twoParamRes = await controller.startTwoParamContinuation(sp.id, preset.param2, twoDConfig, owner);
+            if (!twoParamRes || disposed) break;
+          }
+          if (preset.auto_trace_homoclinic && lcRes && !disposed) {
+            const homSeed = [...(lcRes.specialPoints || [])]
+              .filter((sp) => sp.can_trace_homoclinic)
+              .sort((a, b) => (b.period ?? 0) - (a.period ?? 0))[0];
+            if (homSeed) {
+              twoParamRes = await controller.startTwoParamContinuation(
+                homSeed.id,
+                preset.param2,
+                { ...twoDConfig, homoclinic: true },
+                owner,
+              );
+            }
+          }
+        } else {
+          const sp2d = (epRes.specialPoints || []).find((sp) => sp.ty === 'LP' || sp.ty === 'HB');
+          if (sp2d) {
+            twoParamRes = await controller.startTwoParamContinuation(sp2d.id, preset.param2, twoDConfig, owner);
+          }
+        }
+        if (twoParamRes && !disposed && preset.view_2d) {
+          const nextCfg = model.get('bifurcation_config') || {};
+          model.set('bifurcation_config', { ...nextCfg, viewMode: '2d' });
+          emit(); sync();
         }
       }
       return { ep: epRes, lc: lcRes, twoParam: twoParamRes };

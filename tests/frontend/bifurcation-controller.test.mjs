@@ -308,14 +308,22 @@ test('lazy worker creation, bidirectional EP stitching, LC switch, 2D continuati
   assert.equal(m.get('bifurcation_branches').length, 2);
   assert.ok(m.get('bifurcation_special_points').some((sp) => sp.id === 'LPC1'));
 
-  // Two-parameter continuation from LP1
+  // Two-parameter continuation from LP1 with rl2 clipping
+  ctrl.commit({ bifurcation_config: { rl2_0: 0.75, rl2_1: 0.95 } });
   const lp2Res = await ctrl.startTwoParamContinuation('LP1', 'b');
   assert.ok(lp2Res);
   assert.equal(lp2Res.branch.id, 'lp2_1');
   assert.equal(lp2Res.branch.type, 'LP2');
   assert.equal(lp2Res.branch.param2, 'b');
-  assert.deepEqual(lp2Res.branch.points.map((pt) => pt.p2), [0.7, 0.8, 0.9]);
+  assert.deepEqual(lp2Res.branch.points.map((pt) => pt.p2), [0.8, 0.9]);
   assert.ok(m.get('bifurcation_special_points').some((sp) => sp.id === 'CP1'));
+
+  // Engine v2: LPC -> LPC2 via collocation mesh restart
+  const lpcRestart = ctrl.restartCache.get('LPC1');
+  lpcRestart.restartSp.ups = [[0, 0.9, 0.8]];
+  const lpc2Res = await ctrl.startTwoParamContinuation('LPC1', 'b', { rl2_0: null, rl2_1: null });
+  assert.ok(lpc2Res);
+  assert.equal(lpc2Res.branch.type, 'LPC2');
 
   // Changing model clears branches and restartCache
   ctrl.selectModel('wilson_cowan');

@@ -16,7 +16,7 @@ function _buildStpntCallback(stpnt, ndim) {
   };
 }
 
-function _normalizeBranchPoints(points, ips, is2D) {
+function _normalizeBranchPoints(points, ips, is2D, fixedPeriod = null) {
   const isLC = ips === 2;
   return points.map((pt) => {
     const out = {
@@ -26,12 +26,13 @@ function _normalizeBranchPoints(points, ips, is2D) {
       ty: null,
       lab: 0,
     };
+    if (is2D && pt.par.length > 1) {
+      out.p2 = pt.par[1];
+    }
     if (isLC) {
       out.u_max = pt.u;
       out.u_min = pt.uMin;
-      out.period = pt.par[1];
-    } else if (is2D && pt.par.length > 1) {
-      out.p2 = pt.par[1];
+      out.period = is2D ? (pt.par.length > 2 ? pt.par[2] : fixedPeriod) : pt.par[1];
     }
     return out;
   });
@@ -47,21 +48,37 @@ function _normalizeSpecialPoints(specialPoints, ndim, ips, is2D) {
       lab: sp.lab,
       par: sp.par,
       u1Based: sp.u1Based,
+      ...(sp.ups ? {
+        ntst: sp.ntst,
+        ncol: sp.ncol,
+        ntpl: sp.ntpl,
+        nar: sp.nar,
+        nfpr: sp.nfpr,
+        icp: sp.icp,
+        rldot: sp.rldot,
+        t: sp.t,
+        ups: sp.ups,
+        udotps: sp.udotps,
+      } : {}),
     };
     restartHandles[sp.lab] = restartSp;
+    const spPeriod = sp.par?.[10] ?? sp.par2 ?? 0;
+    const isNonBifLcPoint = sp.ty === 'UZ' || sp.ty === 'EP' || sp.ty === 'RG';
     const item = {
       lab: sp.lab,
       ty: sp.ty,
       p: sp.par1,
-      u: sp.u1Based.slice(0, ndim),
+      u: sp.u1Based.length > ndim ? sp.u1Based.slice(1, ndim + 1) : sp.u1Based.slice(0, ndim),
       can_switch_lc: sp.ty === 'HB',
-      can_trace_2d: sp.ty === 'LP' || sp.ty === 'HB',
+      can_trace_2d: sp.ty === 'LP' || sp.ty === 'HB' || sp.ty === 'LPC' || sp.ty === 'PD' || sp.ty === 'TR',
+      can_trace_homoclinic: Boolean(sp.ups && isNonBifLcPoint && (sp.ty === 'UZ' || spPeriod >= 15)),
       restartSp,
     };
-    if (isLC) {
-      item.period = sp.par2;
-    } else if (is2D) {
+    if (is2D) {
       item.p2 = sp.par2;
+    }
+    if (isLC) {
+      item.period = sp.par?.[10] ?? sp.par2;
     }
     normalized.push(item);
   }
@@ -104,7 +121,7 @@ async function _handleWorkerMessage(data) {
     };
 
     let effectiveRestartSp = continuation.restartSp ?? null;
-    if (effectiveRestartSp && isw === 2 && p1Name && mergedParams[p1Name] !== undefined) {
+    if (effectiveRestartSp && is2D && p1Name && mergedParams[p1Name] !== undefined) {
       const parCopy = [...(effectiveRestartSp.par || [])];
       if (parCopy.length < 2 || (parCopy[1] === 0 && mergedParams[p1Name] !== 0)) {
         parCopy[0] = parCopy[0] ?? 0;
@@ -112,6 +129,18 @@ async function _handleWorkerMessage(data) {
         effectiveRestartSp = { ...effectiveRestartSp, par: parCopy };
       }
     }
+
+    const iuz = [...(continuation.iuz ?? [])];
+    const vuz = [...(continuation.vuz ?? [])];
+    if (continuation.stopPeriod !== undefined && continuation.stopPeriod !== null) {
+      iuz.push(-10);
+      vuz.push(Number(continuation.stopPeriod));
+    }
+
+    const defaultIcp = continuation.icp ?? (ips === 2 && is2D ? [0, 1] : null);
+    const fixedPeriod = (ips === 2 && is2D && effectiveRestartSp?.par?.[10] !== undefined)
+      ? effectiveRestartSp.par[10]
+      : null;
 
     const stpntCb = _buildStpntCallback(continuation.stpnt, ndim);
     const t0 = performance.now();
@@ -131,9 +160,9 @@ async function _handleWorkerMessage(data) {
       dsmax: continuation.dsmax ?? 0.2,
       rl0: continuation.rl0 ?? -1e30,
       rl1: continuation.rl1 ?? 1e30,
-      icp: continuation.icp ?? null,
-      iuz: continuation.iuz ?? [],
-      vuz: continuation.vuz ?? [],
+      icp: defaultIcp,
+      iuz,
+      vuz,
       restartSp: effectiveRestartSp,
       wasmModule: _cachedWasmModule,
       func,
@@ -145,7 +174,7 @@ async function _handleWorkerMessage(data) {
       throw res.error;
     }
 
-    const branch = _normalizeBranchPoints(res.points, ips, is2D);
+    const branch = _normalizeBranchPoints(res.points, ips, is2D, fixedPeriod);
     const { specialPoints, restartHandles } = _normalizeSpecialPoints(res.specialPoints, ndim, ips, is2D);
     return { type: 'result', jobId, branch, specialPoints, restartHandles, elapsedMs };
   }

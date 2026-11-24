@@ -162,7 +162,16 @@ function mountPresentation(context, kind = context.configuration.get('presentati
     const right = slot(body, 'ppw-bif-secondary');
     group(slot(right, 'ppw-secondary-plot'), ['phase_plane'], { fit: true });
     group(slot(right, 'ppw-secondary-plot'), ['time_series'], { fit: true });
-    group(footer, ['parameters'], { primary: true });
+    const modelBar = slot(footer, 'ppw-bif-model-bar');
+    group(modelBar, ['model', 'editor']);
+    group(footer, ['parameters']);
+    const toolsDetails = doc.createElement('details');
+    toolsDetails.className = 'ppw-bif-tools';
+    const toolsSummary = doc.createElement('summary');
+    toolsSummary.textContent = 'Axes, projection, noise & export';
+    toolsDetails.append(toolsSummary);
+    scope.cleanup(inspector(slot(toolsDetails, 'ppw-bif-tools-body'), 'limits'));
+    footer.append(toolsDetails);
   } else if (RESEARCH_KINDS.includes(kind)) {
     group(body, [kind]); group(footer, ['parameters'], { primary: true });
   } else { throw new Error('Unknown presentation: ' + kind); }

@@ -15,6 +15,7 @@ const {
   drawBifurcation1D,
   drawBifurcation2D,
   mountBifurcation,
+  render,
 } = await import('../../src/tvb_phaseplane/static/widget.js');
 
 const cleanups = [];
@@ -249,7 +250,8 @@ test('mountBifurcation renders toolbar, presets, stale/non-smooth/N>2 banners, c
     bifurcation_special_points: [
       { id: 'HB1', label: 'HB1', ty: 'HB', p: 0.5, u: [0.2, 0.3, 0.4], branch_id: 'ep_1', param1: 'I' },
       { id: 'LP1', label: 'LP1', ty: 'LP', p: 0.2, u: [0.1, 0.2, 0.3], branch_id: 'ep_1', param1: 'I' },
-      { id: 'LPC1', label: 'LPC1', ty: 'LPC', p: 0.7, u: [0.3, 0.4, 0.5], branch_id: 'lc_1', param1: 'I' },
+      { id: 'LPC1', label: 'LPC1', ty: 'LPC', p: 0.7, u: [0.3, 0.4, 0.5], branch_id: 'lc_1', param1: 'I', can_trace_2d: true },
+      { id: 'UZ1', label: 'UZ1', ty: 'UZ', p: 0.85, u: [0.3, 0.4, 0.5], period: 30, branch_id: 'lc_1', param1: 'I', can_trace_homoclinic: true },
     ],
     bifurcation_metadata: { stale: true, status: 'complete', fort9: 'AUTO fort.9 summary' },
   });
@@ -306,9 +308,17 @@ test('mountBifurcation renders toolbar, presets, stale/non-smooth/N>2 banners, c
   lpChip.querySelector('.ppw-bif-trace-2d').click();
   assert.deepEqual(calls.at(-1).slice(0, 3), ['start2D', 'LP1', 'a']);
 
-  const lpcBadge = host.querySelector('[data-sp-id="LPC1"] .ppw-bif-chip-badge');
-  assert.ok(lpcBadge);
-  assert.match(lpcBadge.title, /v2/i);
+  const lpcBtn = host.querySelector('[data-sp-id="LPC1"] .ppw-bif-trace-2d');
+  assert.ok(lpcBtn);
+  lpcBtn.click();
+  assert.deepEqual(calls.at(-1).slice(0, 3), ['start2D', 'LPC1', 'a']);
+
+  const homBtn = host.querySelector('[data-sp-id="UZ1"] .ppw-bif-trace-hom');
+  assert.ok(homBtn);
+  homBtn.click();
+  assert.equal(calls.at(-1)[0], 'start2D');
+  assert.equal(calls.at(-1)[1], 'UZ1');
+  assert.equal(calls.at(-1)[3].homoclinic, true);
 
   // 1D/2D switch visibility
   assert.equal(host.querySelector('.ppw-bif-view-switch').hidden, true);
@@ -340,4 +350,76 @@ test('mountBifurcation renders toolbar, presets, stale/non-smooth/N>2 banners, c
   panel.dispose();
   assert.equal(host.querySelector('.ppw-bifurcation'), null);
   assert.equal(calls.at(-1)[0], 'cancel');
+});
+
+test('1D/2D axis bounds, 2D plane filtering, v2 curve/ZH styling, and bifurcation presentation controls', async () => {
+  const m = createTestModel({
+    presentation: 'bifurcation',
+    bifurcation_branches: [
+      { id: 'ep_1', type: 'EP', param1: 'I', points: [{ p: -1, u: [-1, 0], stable: true }, { p: 2, u: [2, 0], stable: false }] },
+      { id: 'lp2_old', type: 'LP2', param1: 'I', param2: 'a', points: [{ p: 0.1, p2: 0.2, u: [0, 0] }, { p: 0.9, p2: 0.9, u: [0.5, 0.2] }] },
+      { id: 'hb2_new', type: 'HB2', param1: 'I', param2: 'b', points: [{ p: -0.2, p2: 0.4, u: [0, 0] }, { p: 0.4, p2: 1.2, u: [0.1, 0.1] }] },
+      { id: 'lpc2_new', type: 'LPC2', param1: 'I', param2: 'b', points: [{ p: -0.1, p2: 0.5, u: [0, 0] }, { p: 0.3, p2: 1.0, u: [0.1, 0.1] }] },
+      { id: 'pd2_new', type: 'PD2', param1: 'I', param2: 'b', points: [{ p: 0.0, p2: 0.6, u: [0, 0] }, { p: 0.2, p2: 0.9, u: [0.1, 0.1] }] },
+      { id: 'hom2_new', type: 'HOM2', param1: 'I', param2: 'b', points: [{ p: -0.15, p2: 0.45, u: [0, 0] }, { p: 0.35, p2: 1.1, u: [0.1, 0.1] }] },
+    ],
+    bifurcation_special_points: [
+      { id: 'CP1', label: 'CP1', ty: 'CP', p: 0.5, p2: 0.6, u: [0, 0], branch_id: 'lp2_old', param1: 'I', param2: 'a' },
+      { id: 'ZH1', label: 'ZH1', ty: 'ZH', p: 0.1, p2: 0.7, u: [0, 0], branch_id: 'hb2_new', param1: 'I', param2: 'b' },
+    ],
+  });
+
+  // Default 2D plane is the most recently added 2D branch's (I, b), filtering out CP1 on (I, a)
+  const ctx2d = createRecordingCtx();
+  drawBifurcation2D(m, ctx2d, 520, 340);
+  const texts2d = ctx2d.calls.filter((c) => c.op === 'fillText').map((c) => c.text);
+  assert.ok(texts2d.includes('b'), 'y-axis should label active param2 b');
+  assert.ok(texts2d.includes('ZH1'), 'ZH1 on active plane should be drawn');
+  assert.ok(!texts2d.includes('CP1'), 'CP1 on inactive plane should be filtered out');
+  const strokes2d = ctx2d.calls.filter((c) => c.op === 'stroke');
+  assert.ok(strokes2d.some((s) => s.strokeStyle === '#2e7d32' && s.dash[0] === 6), 'LPC2 green dashed');
+  assert.ok(strokes2d.some((s) => s.strokeStyle === '#e65100'), 'PD2 orange');
+  assert.ok(strokes2d.some((s) => s.strokeStyle === '#6a1b9a'), 'HOM2 purple');
+
+  // Mount full bifurcation presentation and verify all parameters + model + editor + axes controls
+  const host = document.createElement('div');
+  document.body.append(host);
+  const dispose = await render({ model: m, el: host });
+  cleanups.push(dispose);
+
+  assert.equal(host.querySelectorAll('.ppw-stage-footer .ppw-param').length, 4, 'all 4 parameters shown, not primary-only');
+  assert.ok(host.querySelector('.ppw-model-select'), 'model switcher mounted directly');
+  assert.ok(host.querySelector('.ppw-editor-toggle'), 'equation editor toggle mounted directly');
+  assert.match(host.querySelector('.ppw-bif-support-note').textContent, /1D EP.*LPC2/i);
+
+  // 1D axis override + validation + Auto reset
+  const xmin = host.querySelector('.ppw-bif-xmin');
+  const xmax = host.querySelector('.ppw-bif-xmax');
+  xmin.value = '0.5'; xmax.value = '0.2';
+  xmax.dispatchEvent(new window.Event('change'));
+  assert.equal(host.querySelector('.ppw-bif-axes-error').hidden, false);
+  assert.equal(m.get('bifurcation_config').xlim1d, undefined);
+
+  xmin.value = '-0.2'; xmax.value = '0.8';
+  xmax.dispatchEvent(new window.Event('change'));
+  assert.equal(host.querySelector('.ppw-bif-axes-error').hidden, true);
+  assert.deepEqual(m.get('bifurcation_config').xlim1d, [-0.2, 0.8]);
+
+  host.querySelector('.ppw-bif-axes-auto').click();
+  assert.equal(m.get('bifurcation_config').xlim1d, undefined);
+
+  // Switch to 2D mode, switch plane selector to (I, a), and set 2D y bounds
+  host.querySelector('.ppw-bif-mode-2d').click();
+  assert.equal(m.get('bifurcation_config').viewMode, '2d');
+  const planeSelect = host.querySelector('.ppw-bif-plane2d');
+  assert.equal(planeSelect.options.length, 2);
+  planeSelect.value = JSON.stringify(['I', 'a']);
+  planeSelect.dispatchEvent(new window.Event('change'));
+  assert.equal(m.get('bifurcation_config').plane2d, JSON.stringify(['I', 'a']));
+
+  const ymin = host.querySelector('.ppw-bif-ymin');
+  const ymax = host.querySelector('.ppw-bif-ymax');
+  ymin.value = '0.1'; ymax.value = '0.6';
+  ymax.dispatchEvent(new window.Event('change'));
+  assert.deepEqual(m.get('bifurcation_config').ylim2d, [0.1, 0.6]);
 });

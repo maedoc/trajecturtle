@@ -674,7 +674,7 @@ if (viewConfigs === null) {{
         all_branches = self.bifurcation_branches or []
         all_sps = self.bifurcation_special_points or []
         branches_1d = [b for b in all_branches if b and b.get("type") in ("EP", "LC")]
-        branches_2d = [b for b in all_branches if b and b.get("type") in ("LP2", "HB2")]
+        branches_2d = [b for b in all_branches if b and b.get("type") in ("LP2", "HB2", "LPC2", "PD2", "TR2", "HOM2")]
         is_2d = (cfg.get("viewMode") == "2d" and branches_2d) or (not branches_1d and bool(branches_2d))
 
         obs_key, obs_label = self._resolve_bifurcation_obs()
@@ -687,10 +687,18 @@ if (viewConfigs === null) {{
             param1 = branches_2d[0].get("param1") or cfg.get("param1") or (param_names[0] if param_names else "p1")
             param2 = branches_2d[0].get("param2") or cfg.get("param2") or next((k for k in param_names if k != param1), "p2")
             xlabel, ylabel = param1.replace("_", r"\_"), param2.replace("_", r"\_")
+            color_map = {
+                "LP2": "blue!75!black",
+                "HB2": "red!75!black",
+                "LPC2": "green!60!black, dashed",
+                "PD2": "orange!85!black",
+                "TR2": "cyan!70!black",
+                "HOM2": "violet!80!black, dash pattern=on 6pt off 3pt on 2pt off 3pt",
+            }
             for br in branches_2d:
                 coords = [[float(pt["p"]), float(pt["p2"])] for pt in br.get("points") or [] if "p" in pt and "p2" in pt]
                 if len(coords) >= 2:
-                    color = "red!75!black" if br.get("type") == "HB2" else "blue!75!black"
+                    color = color_map.get(br.get("type"), "blue!75!black")
                     plots.append(f"            \\addplot[{color}, thick, no marks] {self._fmt_coords(coords)};")
             b_ids = {br.get("id") for br in branches_2d}
             for sp in all_sps:

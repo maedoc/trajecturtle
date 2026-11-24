@@ -118,22 +118,111 @@ DEMOS = {
 
 
 def build_bifurcation_demo():
-    """Generate an interactive AUTO2000 WASM bifurcation continuation demo."""
+    """Generate an interactive AUTO2000 WASM bifurcation continuation demo
+    using the DBT fast-subsystem equations (exhibits Fold LP + Hopf HB +
+    limit cycles + 2D cusp/Bogdanov-Takens structure)."""
     out_dir = Path(__file__).parent.parent / "docs" / "demos"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "bifurcation_auto2000.html"
 
+    dbt_spec = {
+        "name": "DBT Fast Subsystem",
+        "state_vars": {
+            "x": {"default": 0.5, "range": [-2.0, 2.0]},
+            "y": {"default": 0.0, "range": [-2.0, 2.0]},
+        },
+        "parameters": {
+            "z":    {"default": -0.5, "range": [-2.0, 3.5], "step": 0.01},
+            "w":    {"default": 0.2,  "range": [-0.5, 1.5], "step": 0.01},
+            "mu2C": {"default": 1.0,  "range": [0.0, 3.0],  "step": 0.05},
+            "mu1B": {"default": 1.0,  "range": [0.0, 3.0],  "step": 0.05},
+            "nuC":  {"default": 1.0,  "range": [-2.0, 3.0], "step": 0.05},
+            "b":    {"default": 1.5,  "range": [-3.0, 3.0], "step": 0.05},
+        },
+        "equations": {
+            "x": "y",
+            "y": "-x^3 + mu2C*w*x - mu1B*z - y*(nuC*w + b*x + x^2)",
+        },
+        "display": [0, 1],
+        "integrator": "rk4",
+    }
+
     widget = PhasePlaneWidget(
-        model_name="fitzhugh_nagumo",
-        params={"a": 0.7, "b": 0.8, "epsilon": 0.08, "I": 0.5},
-        x0=-1.0,
-        y0=-0.5,
-        t_max=100.0,
+        model_spec=dbt_spec,
+        x0=0.888,
+        y0=0.0,
+        t_max=50.0,
         presentation="bifurcation",
+        bifurcation_config={
+            "param1": "z",
+            "observable": 0,
+            "rl0": -2.0,
+            "rl1": 3.5,
+            "rl2_0": -0.1,
+            "rl2_1": 1.2,
+            "stopPeriod": 30,
+            "ntst": 60,
+            "ds": 0.02,
+            "dsmax": 0.1,
+            "nmx": 300,
+        },
+        bifurcation_presets=[
+            {"label": "1D: Fold + Hopf in z", "param1": "z", "range": [-2.0, 3.5]},
+            {"label": "1D: EP + Limit cycles in z", "param1": "z", "range": [-2.0, 3.5], "auto_switch_lc": True, "stop_period": 30},
+            {"label": "2D: (z, w) Fold curve", "param1": "z", "range": [-2.0, 3.5], "param2": "w", "range2": [-0.1, 1.2], "auto_trace_2d": True, "view_2d": True},
+            {
+                "label": "2D: (z, w) Fold + Hopf + Homoclinic",
+                "param1": "z",
+                "range": [-2.0, 3.5],
+                "param2": "w",
+                "range2": [-0.1, 1.2],
+                "xlim2d": [-0.6, 0.6],
+                "ylim2d": [-0.05, 0.8],
+                "stop_period": 30,
+                "auto_trace_2d": "all",
+                "auto_trace_homoclinic": True,
+                "view_2d": True,
+            },
+        ],
     )
     widget.to_standalone_html(
         str(out),
         title="Trajecturtle — AUTO2000 Bifurcation Continuation",
+        include_auto=True,
+    )
+    print(f"Generated {out.name} ({out.stat().st_size:,} bytes)")
+
+
+def build_bifurcation_mpr_demo():
+    """Generate a companion AUTO2000 bifurcation demo for the MPR (QIF) model."""
+    out_dir = Path(__file__).parent.parent / "docs" / "demos"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / "bifurcation_mpr.html"
+
+    widget = PhasePlaneWidget(
+        model_name="mpr",
+        params={"delta": 1.0, "eta_bar": -5.0, "J": 15.0, "I": 0.0},
+        x0=0.5,
+        y0=-0.3,
+        t_max=100.0,
+        presentation="bifurcation",
+        bifurcation_config={
+            "param1": "eta_bar",
+            "observable": 0,
+            "rl0": -15.0,
+            "rl1": 2.0,
+            "ds": 0.05,
+            "dsmax": 0.2,
+            "nmx": 300,
+        },
+        bifurcation_presets=[
+            {"label": "1D: Fold in eta_bar", "param1": "eta_bar", "range": [-15.0, 2.0]},
+            {"label": "2D: (eta_bar, J) Fold cusp", "param1": "eta_bar", "range": [-20.0, 5.0], "param2": "J", "range2": [0.0, 25.0], "auto_trace_2d": True},
+        ],
+    )
+    widget.to_standalone_html(
+        str(out),
+        title="Trajecturtle — MPR Bifurcation Continuation",
         include_auto=True,
     )
     print(f"Generated {out.name} ({out.stat().st_size:,} bytes)")
@@ -158,6 +247,7 @@ def main():
         print(f"Generated {out_path.name} ({out_path.stat().st_size:,} bytes)")
 
     build_bifurcation_demo()
+    build_bifurcation_mpr_demo()
     build_custom_demo()
     from build_design_gallery import build_design_gallery
     build_design_gallery()

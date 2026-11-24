@@ -172,7 +172,7 @@ function mountExport({ model, controller, document: doc }) {
     const branches = model.get('bifurcation_branches') || [];
     if (controller.error || !branches.length) return;
     const has1d = branches.some(b => b && (b.type === 'EP' || b.type === 'LC'));
-    const has2d = branches.some(b => b && (b.type === 'LP2' || b.type === 'HB2'));
+    const has2d = branches.some(b => b && ['LP2', 'HB2', 'LPC2', 'PD2', 'TR2', 'HOM2'].includes(b.type));
     const use2d = (model.get('bifurcation_config')?.viewMode === '2d' && has2d) || (!has1d && has2d);
     const canvas = new C2S(560, 420);
     if (use2d) drawBifurcation2D(model, canvas, 560, 420, plotTheme(element));
