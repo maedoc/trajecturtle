@@ -174,3 +174,28 @@ def test_3d_model_projection():
     assert pp.model_spec["display"] == [0, 1]
     assert len(pp.model_spec["equations"]) == 3
     assert pp.model_spec["equations"]["z"] is not None
+
+
+def test_dt_and_bounds_and_builtin_helpers():
+    """Verify dt traitlet, bounds serialization, and safe_exp/step/rww_H in rhs_function."""
+    spec = ModelSpec.from_strings(
+        equations=[
+            "1.0 / (1.0 + safe_exp(-x)) + step(x) - rww_H(x, 0.154)",
+            "-y",
+        ],
+        state_vars={"x": (0.0, 2.0), "y": (-1.0, 1.0)},
+        params={},
+        bounds={"x": (0.0, None)},
+    )
+    state = spec.to_widget_state()
+    assert state["state_vars"]["x"]["bounds"] == [0.0, None]
+    assert "bounds" not in state["state_vars"]["y"]
+
+    rhs = spec.rhs_function({})
+    val = rhs(0.0, [0.0, 0.5])
+    assert np.isfinite(val[0])
+    assert np.isclose(val[0], 0.5 + 1.0 - (1.0 / 0.154))
+    assert np.isclose(val[1], -0.5)
+
+    pp = PhasePlaneWidget(model_spec=state, dt=0.05)
+    assert pp.dt == 0.05

@@ -152,11 +152,38 @@ function sortCustomFunctions(cfDict) {
   return ordered;
 }
 
+let _builtinMathRegistered = false;
+/** Register safe_exp, step, and rww_H in nerdamer's parser and Math2 compiler scope. */
+function registerBuiltinMathHelpers() {
+  if (_builtinMathRegistered || typeof nerdamer === 'undefined') return;
+  const core = nerdamer.getCore();
+  core.Math2.safe_exp = function safe_exp(x) {
+    return Math.exp(Math.max(-709, Math.min(709, x)));
+  };
+  core.Math2.step = function step(x) {
+    return x >= 0 ? 1 : 0;
+  };
+  core.Math2.rww_H = function rww_H(x, d) {
+    return Math.abs(d * x) < 1e-7
+      ? 1 / d
+      : x / (1 - Math.exp(Math.max(-709, Math.min(709, -d * x))));
+  };
+  const wrap = (name) => (...args) => {
+    const flat = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+    return core.PARSER.symfunction(name, flat);
+  };
+  core.PARSER.functions.safe_exp = [wrap('safe_exp'), 1];
+  core.PARSER.functions.step = [wrap('step'), 1];
+  core.PARSER.functions.rww_H = [wrap('rww_H'), [1, 2]];
+  _builtinMathRegistered = true;
+}
+
 /** Register custom functions with nerdamer in topological order.
  *
  *  @param {Object} cfDict - {name: {vars: [...], expr: "..."}}
  */
 function registerCustomFunctions(cfDict) {
+  registerBuiltinMathHelpers();
   if (!cfDict || Object.keys(cfDict).length === 0) return;
   const ordered = sortCustomFunctions(cfDict);
   for (const [name, vars, body] of ordered) {
@@ -226,6 +253,11 @@ function compileModelSpec(spec) {
     const sv = spec.state_vars[name];
     return sv && sv.range ? [...sv.range] : [-5, 5];
   });
+  const bounds = stateVars.map((name) => {
+    const b = spec.state_vars[name]?.bounds ?? spec.bounds?.[name];
+    return Array.isArray(b) && b.length === 2 ? [b[0], b[1]] : null;
+  });
+  const hasBounds = bounds.some((b) => b !== null);
   const defaultXlim = defaultLims[display[0]] || [-5, 5];
   const defaultYlim = display.length > 1 ? (defaultLims[display[1]] || [-5, 5]) : [-5, 5];
 
@@ -239,6 +271,7 @@ function compileModelSpec(spec) {
     defaultXlim: [...defaultXlim],
     defaultYlim: [...defaultYlim],
     defaultLims: defaultLims.map((l) => [...l]),
+    bounds: hasBounds ? bounds : null,
     f,
     _compiledEqs: compiledEqs,
     _rawExprs: rawExprs,
@@ -381,27 +414,41 @@ function _rk4Core(modelName, y0, t0, tf, h, params) {
   return results;
 }
 
+/** Clamp a state vector to optional per-variable [lo, hi] bounds. */
+function clampState(y, bounds) {
+  if (!bounds) return y;
+  return y.map((yi, i) => {
+    const b = bounds[i];
+    if (!b) return yi;
+    let v = yi;
+    if (b[0] != null && v < b[0]) v = b[0];
+    if (b[1] != null && v > b[1]) v = b[1];
+    return v;
+  });
+}
+
 /** Safe RK4 wrapper with NaN/Inf detection, step budget, and exp clamping.
  *  Returns array of [t, v0, v1, ...] rows, truncated on NaN/Inf/budget. */
 function rk4(modelName, y0, t0, tf, h, params) {
   const MAX_STEPS = 50000;
   const f = typeof modelName === 'object' ? modelName.f : MODELS[modelName].f;
-  const results = [[t0, ...y0]];
+  const bounds = typeof modelName === 'object' ? modelName.bounds : MODELS[modelName]?.bounds;
+  let y = clampState([...y0], bounds);
+  const results = [[t0, ...y]];
   let t = t0;
-  let y = [...y0];
   let steps = 0;
   while (t < tf - 1e-12) {
     if (steps >= MAX_STEPS) break;
     const dt = Math.min(h, tf - t);
     const k1 = f(t, y, params);
     if (k1.some(v => !isFinite(v))) break;
-    const k2 = f(t + dt / 2, y.map((yi, i) => yi + (dt / 2) * k1[i]), params);
+    const k2 = f(t + dt / 2, clampState(y.map((yi, i) => yi + (dt / 2) * k1[i]), bounds), params);
     if (k2.some(v => !isFinite(v))) break;
-    const k3 = f(t + dt / 2, y.map((yi, i) => yi + (dt / 2) * k2[i]), params);
+    const k3 = f(t + dt / 2, clampState(y.map((yi, i) => yi + (dt / 2) * k2[i]), bounds), params);
     if (k3.some(v => !isFinite(v))) break;
-    const k4 = f(t + dt, y.map((yi, i) => yi + dt * k3[i]), params);
+    const k4 = f(t + dt, clampState(y.map((yi, i) => yi + dt * k3[i]), bounds), params);
     if (k4.some(v => !isFinite(v))) break;
-    y = y.map((yi, i) => yi + (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+    y = clampState(y.map((yi, i) => yi + (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])), bounds);
     t += dt;
     if (y.some((v) => !isFinite(v))) break;
     results.push([t, ...y]);
@@ -430,10 +477,11 @@ function heun(modelName, y0, t0, tf, h, params, noiseSigma, seed = 0) {
     return (rngState + 0.5) / 4294967296;
   };
   const f = typeof modelName === 'object' ? modelName.f : MODELS[modelName].f;
+  const bounds = typeof modelName === 'object' ? modelName.bounds : MODELS[modelName]?.bounds;
   const dim = y0.length;
-  const results = [[t0, ...y0]];
+  let y = clampState([...y0], bounds);
+  const results = [[t0, ...y]];
   let t = t0;
-  let y = [...y0];
   let steps = 0;
   const maxSteps = 50000;
   while (t < tf - 1e-12 && steps < maxSteps) {
@@ -446,10 +494,10 @@ function heun(modelName, y0, t0, tf, h, params, noiseSigma, seed = 0) {
     }
     // Predictor: Ytilde = Yn + f(Yn)*dt + sigma*dW
     const fn = f(t, y, params);
-    const yTilde = y.map((yi, i) => yi + fn[i] * dt + (noiseSigma[i] || 0) * dW[i]);
+    const yTilde = clampState(y.map((yi, i) => yi + fn[i] * dt + (noiseSigma[i] || 0) * dW[i]), bounds);
     // Corrector: Yn+1 = Yn + 0.5*(f(Yn)+f(Ytilde))*dt + sigma*dW
     const fTilde = f(t + dt, yTilde, params);
-    y = y.map((yi, i) => yi + 0.5 * (fn[i] + fTilde[i]) * dt + (noiseSigma[i] || 0) * dW[i]);
+    y = clampState(y.map((yi, i) => yi + 0.5 * (fn[i] + fTilde[i]) * dt + (noiseSigma[i] || 0) * dW[i]), bounds);
     t += dt;
     steps++;
     // Check for NaN / blow-up and abort gracefully

@@ -113,5 +113,11 @@ function canvasSurface(canvas, scope, draw, { width = 500, ratio = 1, minHeight 
   }
   const Observer = canvas.ownerDocument.defaultView.ResizeObserver;
   if (Observer) { const observer = new Observer(render); observer.observe(canvas); if (canvas.parentElement) observer.observe(canvas.parentElement); scope.cleanup(() => observer.disconnect()); }
+  const ThemeObserver = canvas.ownerDocument.defaultView.MutationObserver;
+  if (ThemeObserver && canvas.ownerDocument.documentElement) {
+    const themeObserver = new ThemeObserver(render);
+    themeObserver.observe(canvas.ownerDocument.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-mode'] });
+    scope.cleanup(() => themeObserver.disconnect());
+  }
   return { render, get width() { return w; }, get height() { return h; } };
 }

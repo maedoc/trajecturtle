@@ -515,3 +515,37 @@ test('lesson tasks and the instrument drawer mount only active tools and retain 
   el.querySelector('.ppw-drawer-toggle').click();
   assert.equal(el.querySelectorAll('.ppw-param-number').length, 1);
 });
+
+test('dt, bounds clamping, safe math helpers, and theme observer cleanup', async () => {
+  const m = model({
+    model_name: 'custom',
+    model_spec: {
+      name: 'BoundedHelper',
+      state_vars: {
+        r: { default: 0.5, range: [0, 2], bounds: [0, null] },
+        v: { default: 0, range: [-2, 2] },
+      },
+      parameters: { c: { default: 1.0, range: [0, 2], step: 0.1 } },
+      equations: { r: '-10 * r - c + step(v)', v: '1.0 / (1.0 + safe_exp(-1000)) - rww_H(v, 0.154)' },
+      display: [0, 1],
+      custom_functions: {},
+      integrator: 'rk4',
+    },
+    state_names: ['r', 'v'],
+    params: { c: 1.0 },
+    param_info: { c: [0, 2, 1.0, 'c'] },
+    x0: 0.1,
+    y0: 0.0,
+    dt: 0.05,
+    t_max: 1.0,
+  });
+  const el = await mount(m);
+  const traj = m.get('trajectory');
+  assert.ok(traj.length > 5);
+  assert.ok(traj.every(([, r, v]) => Number.isFinite(r) && Number.isFinite(v) && r >= 0));
+  assert.ok(Math.abs(traj[traj.length - 1][0] - 1.0) < 1e-6);
+
+  document.documentElement.classList.add('dark');
+  await pause(20);
+  document.documentElement.classList.remove('dark');
+});

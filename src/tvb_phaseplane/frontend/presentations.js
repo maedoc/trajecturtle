@@ -23,7 +23,7 @@ function mountReadout({ model, document: doc }) {
     if (!points.length) text('p', 'No equilibria found in the current window.');
     for (const [x, y, stability] of points.slice(0, 12)) text('p', `${Number(x).toFixed(3)}, ${Number(y).toFixed(3)} — ${stability.replaceAll('_', ' ')}`);
     if (points.length > 12) text('p', `${points.length - 12} more points in this window`);
-    text('small', `${model.get('integrator') || 'rk4'} · dt = 0.01 · duration ${model.get('t_max')}${model.get('noise_enable') ? ` · noise seed ${model.get('noise_seed')}` : ' · deterministic'}`);
+    text('small', `${model.get('integrator') || 'rk4'} · dt = ${model.get('dt') ?? 0.01} · duration ${model.get('t_max')}${model.get('noise_enable') ? ` · noise seed ${model.get('noise_seed')}` : ' · deterministic'}`);
     if (names.length > 2) text('p', 'Nullclines/equilibria describe a clamped slice; trajectories integrate the full system.');
   });
 }

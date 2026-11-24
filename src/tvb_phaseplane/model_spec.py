@@ -62,6 +62,7 @@ class ModelSpec:
         parameters: dict[str, tuple[float, tuple[float, float], float]],
         display: list[str] | None = None,
         custom_functions: dict[str, tuple[list[str], Expr]] | None = None,
+        bounds: dict[str, tuple[float | None, float | None]] | None = None,
         integrator: str = "rk4",
         noise_per_var: list[float] | None = None,
         name: str = "Custom",
@@ -71,6 +72,7 @@ class ModelSpec:
         self.state_vars = dict(state_vars)
         self.parameters = dict(parameters)
         self.custom_functions = dict(custom_functions or {})
+        self.bounds = dict(bounds or {})
         self.integrator = integrator
         self.noise_per_var = (
             list(noise_per_var) if noise_per_var is not None else None
@@ -79,6 +81,17 @@ class ModelSpec:
         # ── Validation ──
         state_names = list(self.state_vars.keys())
         param_names = list(self.parameters.keys())
+
+        for bname, (blo, bhi) in self.bounds.items():
+            if bname not in state_names:
+                raise ValueError(
+                    f"Bound key '{bname}' is not a declared state variable. "
+                    f"Declared: {state_names}"
+                )
+            if blo is not None and bhi is not None and float(blo) > float(bhi):
+                raise ValueError(
+                    f"Invalid bounds for '{bname}': lower {blo} > upper {bhi}"
+                )
 
         for eq_name in self.equations:
             if eq_name not in state_names:
@@ -155,7 +168,9 @@ class ModelSpec:
 
         # Build symbols
         all_names = list(state_vars.keys()) + list(params.keys())
-        sym_map = {n: sp.Symbol(n) for n in all_names}
+        sym_map: dict[str, Any] = {n: sp.Symbol(n) for n in all_names}
+        for builtin_fn in ("safe_exp", "step", "rww_H"):
+            sym_map.setdefault(builtin_fn, sp.Function(builtin_fn))
 
         # Parse equations
         eq_exprs: dict[str, Expr] = {}
@@ -189,11 +204,13 @@ class ModelSpec:
         cf_parsed: dict[str, tuple[list[str], Expr]] | None = None
         if custom_functions:
             cf_parsed = {}
-            for fname, fbody in custom_functions.items():
-                # fbody can be a string expression; we need arg names.
-                # For now, assume no nested custom functions in the
-                # string-based API.
-                cf_parsed[fname] = ([], sp.parse_expr(fbody, local_dict=sym_map))
+            for fname, fspec in custom_functions.items():
+                if isinstance(fspec, tuple):
+                    fargs, fbody = list(fspec[0]), fspec[1]
+                    cf_sym_map = {**sym_map, **{a: sp.Symbol(a) for a in fargs}}
+                    cf_parsed[fname] = (fargs, sp.parse_expr(fbody, local_dict=cf_sym_map))
+                else:
+                    cf_parsed[fname] = ([], sp.parse_expr(fspec, local_dict=sym_map))
 
         return cls(
             equations=eq_exprs,
@@ -261,10 +278,31 @@ class ModelSpec:
 
         Suitable for use with ``scipy.integrate.solve_ivp``.
         """
+        import numpy as np
+
+        def _safe_exp(x):
+            return np.exp(np.clip(x, -709.0, 709.0))
+
+        def _step(x):
+            return np.where(np.asarray(x) >= 0.0, 1.0, 0.0)
+
+        def _rww_H(x, d):
+            dx = np.asarray(d) * np.asarray(x)
+            small = np.abs(dx) < 1e-7
+            safe_dx = np.where(small, 1.0, dx)
+            return np.where(
+                small,
+                1.0 / np.asarray(d),
+                np.asarray(x) / (1.0 - np.exp(np.clip(-safe_dx, -709.0, 709.0))),
+            )
+
+        modules = [
+            {"safe_exp": _safe_exp, "step": _step, "rww_H": _rww_H},
+            "numpy",
+        ]
         all_syms = list(self.state_vars.keys()) + list(self.parameters.keys())
-        sym_map = {n: sp.Symbol(n) for n in all_syms}
         eq_list = [self.equations[n] for n in self.state_vars]
-        lambdas = [sp.lambdify(all_syms, eq, "numpy") for eq in eq_list]
+        lambdas = [sp.lambdify(all_syms, eq, modules) for eq in eq_list]
 
         def f(t: float, state: list[float]) -> list[float]:
             args = list(state) + [param_values.get(p, 0.0) for p in self.parameters]
@@ -347,7 +385,18 @@ class ModelSpec:
         return {
             "name": self.name,
             "state_vars": {
-                n: {"default": d, "range": [lo, hi]}
+                n: {
+                    "default": d,
+                    "range": [lo, hi],
+                    **(
+                        {"bounds": [
+                            float(self.bounds[n][0]) if self.bounds[n][0] is not None else None,
+                            float(self.bounds[n][1]) if self.bounds[n][1] is not None else None,
+                        ]}
+                        if n in self.bounds
+                        else {}
+                    ),
+                }
                 for n, (d, (lo, hi)) in self.state_vars.items()
             },
             "parameters": {

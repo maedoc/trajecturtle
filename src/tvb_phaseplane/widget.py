@@ -46,6 +46,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     xlim = traitlets.List([-0.5, 1.5]).tag(sync=True)
     ylim = traitlets.List([-0.5, 1.5]).tag(sync=True)
     t_max = traitlets.Float(100.0).tag(sync=True)
+    dt = traitlets.Float(0.01).tag(sync=True)
 
     # Pre-computed data (populated by JS, kept for inspection / export)
     nullcline_x = traitlets.List([]).tag(sync=True)
@@ -130,7 +131,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
         else:
             self._update_model()
         self.experiment_id = self.model_id
-        for name in ("params", "xlim", "ylim", "x0", "y0", "display", "clamped",
+        for name in ("params", "xlim", "ylim", "x0", "y0", "dt", "display", "clamped",
                      "state_names", "param_info", "integrator", "noise_enable", "noise_sigma"):
             if name in kwargs:
                 setattr(self, name, {**self.params, **kwargs[name]} if name == "params" else kwargs[name])
@@ -292,6 +293,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "xlim": self.xlim,
             "ylim": self.ylim,
             "t_max": self.t_max,
+            "dt": self.dt,
             "show_nullclines": self.show_nullclines,
             "show_vector_field": self.show_vector_field,
             "show_trajectory": self.show_trajectory,

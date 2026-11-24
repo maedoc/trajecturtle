@@ -1,6 +1,6 @@
 const EXPERIMENT_CACHE = Symbol.for('trajecturtle.experiment-cache');
 const EXPERIMENT_SESSION = Symbol.for('trajecturtle.experiment-session');
-const RESET_KEYS = ['model_spec','model_name','param_info','state_names','display','clamped','params','x0','y0','xlim','ylim','t_max','noise_seed','integrator','noise_enable','noise_sigma'];
+const RESET_KEYS = ['model_spec','model_name','param_info','state_names','display','clamped','params','x0','y0','xlim','ylim','t_max','dt','noise_seed','integrator','noise_enable','noise_sigma'];
 
 export function experimentSession(model) {
   return model[EXPERIMENT_SESSION] ||= {
@@ -93,11 +93,12 @@ function computeExperimentState(model) {
   const integrator = model.get('integrator') || 'rk4';
   const noiseSigma = (integrator === 'heun' && model.get('noise_enable'))
                      ? model.get('noise_sigma') : null;
+  const dt = Math.max(1e-6, Number(model.get('dt')) || 0.01);
   const settings = { integrator, noiseSigma, seed: model.get('noise_seed') || 0 };
-  const trajectoryKey = JSON.stringify([modelName, _spec4proj, params, fullState0, tMax, settings]);
+  const trajectoryKey = JSON.stringify([modelName, _spec4proj, params, fullState0, tMax, dt, settings]);
   if (cache.trajectory !== trajectoryKey) {
     const trajDef = (modelName === 'custom' && def && def.f) ? def : modelName;
-    const traj = simulate(trajDef, fullState0, 0, tMax, 0.01, params, settings);
+    const traj = simulate(trajDef, fullState0, 0, tMax, dt, params, settings);
     const step = Math.max(1, Math.ceil(traj.length / 2000));
     const trajDisplay = traj.filter((_, i) => i % step === 0 || i === traj.length - 1);
     model.set("trajectory", trajDisplay);
