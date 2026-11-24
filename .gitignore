@@ -20,6 +20,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# Frontend test dependencies
+node_modules/
+
 # Virtual environments
 .venv/
 venv/
@@ -29,6 +32,7 @@ ENV/
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+!docs/notebooks/view-feedback.ipynb
 
 # IDEs
 .vscode/

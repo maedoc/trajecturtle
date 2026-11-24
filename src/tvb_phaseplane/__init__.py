@@ -6,6 +6,8 @@ from .widget import PhasePlaneWidget
 
 __all__ = [
     "PhasePlaneWidget",
+    "explore",
+    "phase_plane",
     "BaseModel",
     "WilsonCowan",
     "FitzHughNagumo",
@@ -14,6 +16,34 @@ __all__ = [
     "ModelSpec",
 ]
 __version__ = "0.1.0"
+
+
+def explore(model_name="fitzhugh_nagumo", *, parameters=None, presentation="figure", **kwargs):
+    """Create a notebook widget with a picker for five experimental layouts.
+
+    Parameters
+    ----------
+    model_name : str
+        Built-in model name; defaults to FitzHugh–Nagumo.
+    parameters : list[str] or None
+        Primary slider names, in display order. None selects model defaults.
+    presentation : str
+        Starting layout: figure, bench, drawer, comparison or lesson.
+    **kwargs
+        Experiment settings passed to PhasePlaneWidget, e.g. params, t_max,
+        x0, y0 or model_spec. The returned widget can also export static HTML.
+
+    Examples
+    --------
+    >>> from tvb_phaseplane import explore
+    >>> lab = explore(params={"I": 0.5}, parameters=["I", "epsilon"])
+    >>> # Display lab as the last expression of a notebook cell.
+
+    Layout switches preserve parameters, references and completed sweep results.
+    Leaving a running sweep cancels it. No feedback or telemetry is sent.
+    """
+    return PhasePlaneWidget(model_name=model_name, presentation=presentation,
+                            visible_parameters=parameters, view_switcher=True, **kwargs)
 
 
 def phase_plane(

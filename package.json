@@ -1,0 +1,12 @@
+{
+  "name": "trajecturtle-frontend-tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/frontend/*.test.mjs",
+    "test:host": "node tests/frontend/notebook-host.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "playwright": "^1.65.1"
+  }
+}

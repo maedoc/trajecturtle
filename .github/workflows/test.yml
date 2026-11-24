@@ -1,0 +1,51 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.10', '3.12']
+        anywidget: ['0.9.0', 'latest']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install Python dependencies
+        run: |
+          uv venv --python '${{ matrix.python }}'
+          uv pip install -e . pytest
+          if [ '${{ matrix.anywidget }}' != latest ]; then
+            uv pip install 'anywidget==${{ matrix.anywidget }}'
+          fi
+      - name: Python and bundled-engine tests
+        run: uv run --no-sync pytest -q
+      - name: Check generated frontend
+        run: |
+          uv run --no-sync python scripts/build_frontend.py --check
+          node --input-type=module --check < src/tvb_phaseplane/static/widget.js
+          git diff --check
+      - name: DOM lifecycle tests
+        run: |
+          npm ci --ignore-scripts
+          npm test
+      - name: Real JupyterLab and standalone browser checks
+        if: matrix.python == '3.12'
+        run: |
+          uv pip install jupyterlab
+          npx playwright install --with-deps chromium
+          uv run --no-sync npm run test:host
+      - name: Build and smoke-test installed wheel
+        run: |
+          uv build --wheel
+          uv venv /tmp/wheel-test --python '${{ matrix.python }}'
+          uv pip install --python /tmp/wheel-test/bin/python dist/*.whl
+          cd /tmp
+          /tmp/wheel-test/bin/python -c "from tvb_phaseplane import PhasePlaneWidget; w = PhasePlaneWidget(panels=['phase_plane']); w.view(['parameters']); w.to_standalone_html('/tmp/wheel-export.html')"

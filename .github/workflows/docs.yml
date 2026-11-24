@@ -35,6 +35,9 @@ jobs:
       - name: Generate demo widgets
         run: uv run --extra docs python scripts/generate_demos.py
 
+      - name: Check frontend bundle
+        run: uv run python scripts/build_frontend.py --check
+
       - name: Build mkdocs
         run: uv run --extra docs mkdocs build --strict
 

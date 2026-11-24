@@ -242,3 +242,50 @@ This site is built automatically by a GitHub Actions workflow that:
 4. Deploys to GitHub Pages
 
 The demos are live widgets — you can interact with them directly in the documentation.
+
+## Composable views and validation
+
+`PhasePlaneWidget(panels=["parameters", "phase_plane", "time_series"],
+visible_parameters=["Pe"])` selects a focused interface. A widget's
+`view(["phase_plane"])` and `view(["parameters"], parameters=["Pe"])` return
+separate notebook outputs referencing the same experiment. Hold the experiment
+in a Python variable for the lifetime of its views. Changes to its traits update
+the views through the widget communication channel.
+
+For static HTML, `to_standalone_html("lesson.html", views=[
+{"panels": ["parameters"], "visible_parameters": ["Pe"]},
+{"panels": ["phase_plane", "time_series"]}])` exports linked views using one
+browser state object. This does not require Python at viewing time.
+
+### Validation status
+
+| Host | Evidence for composable views |
+| --- | --- |
+| Standalone HTML | Chromium browser test: linked controls and rendered plot updates, without a kernel |
+| JupyterLab 4.6.6 | Chromium browser test with anywidget 0.9.0 and 0.11.0: separate-cell views, Python assignments, control-to-kernel synchronization, independent experiments, output remounting, custom models and seeded noise |
+| JupyterLab 4.5.6 (locked environment) | The same browser checks passed with anywidget 0.10.0 |
+| Classic Notebook | Not yet verified end to end |
+| VS Code notebooks | Not yet verified end to end |
+| JupyterLite | Not yet verified, including package installation |
+
+Run `npm test` for focused DOM lifecycle checks and `uv run npm run test:host`
+for the real JupyterLab and standalone browser checks (after `uv sync --extra dev`,
+`npm ci`, and `npx playwright install chromium`). The host test launches a
+temporary local server and cleans it up automatically. These checks do not
+establish compatibility with every browser or notebook host.
+
+JupyterLite package installation is a separate requirement from the fact that
+the numerical engine runs in JavaScript. Do not infer verified JupyterLite
+support from standalone HTML support.
+
+Reset uses a browser-owned first-mount snapshot shared by linked views; reloading
+the frontend establishes a new baseline. A running sweep is cancelled if its
+owning view is removed/remounted or experiment inputs change. Panels are created
+only when requested and follow the supplied list order. Narrow containers stack
+panels automatically; plots use device-pixel-resolution canvases. Comparison/reset
+controls live in the `comparison` panel, independent of SVG/TikZ `export`.
+
+For each notebook host, verify two views in separate cells, a Python parameter
+assignment, a slider update in the other view, output disposal, seeded noise,
+and a custom model. Test a fresh environment rather than relying on previously
+installed widget extensions.

@@ -12,6 +12,7 @@ import pathlib
 import tempfile
 
 import anywidget
+import ipywidgets
 import numpy as np
 import traitlets
 
@@ -56,6 +57,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     sweep_results = traitlets.List([]).tag(sync=True)
     sweep_fixed_points = traitlets.List([]).tag(sync=True)
     sweep_running = traitlets.Bool(False).tag(sync=True)
+    sweep_metadata = traitlets.Dict({}).tag(sync=True)
 
     # Display toggles
     show_nullclines = traitlets.Bool(True).tag(sync=True)
@@ -67,6 +69,12 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     integrator = traitlets.Unicode("rk4").tag(sync=True)
     noise_enable = traitlets.Bool(False).tag(sync=True)
     noise_sigma = traitlets.List([]).tag(sync=True)
+    noise_seed = traitlets.Int(0).tag(sync=True)
+    reference_trajectory = traitlets.List([]).tag(sync=True)
+    reference_scene = traitlets.Dict({}).tag(sync=True)
+    show_reference = traitlets.Bool(True).tag(sync=True)
+    reference_metadata = traitlets.Dict({}).tag(sync=True)
+    trajectory_fraction = traitlets.Float(1.0).tag(sync=True)
 
     # Custom model specification (JSON-serialisable dict for JS)
     model_spec = traitlets.Dict(allow_none=True, default_value=None).tag(sync=True)
@@ -80,6 +88,22 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     # Layout mode: "full" shows controls + phase plane + time series + sweep
     # "phase_plane" shows only the phase plane canvas (useful in notebooks / iframes)
     display_mode = traitlets.Unicode("full").tag(sync=True)
+    panels = traitlets.List(traitlets.Unicode(), default_value=[]).tag(sync=True)
+    visible_parameters = traitlets.List(traitlets.Unicode(), allow_none=True, default_value=None).tag(sync=True)
+    panel_layout = traitlets.Enum(["horizontal", "vertical"], default_value="horizontal").tag(sync=True)
+    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson"], default_value="panels").tag(sync=True)
+    view_switcher = traitlets.Bool(False).tag(sync=True)
+    sweep_param = traitlets.Unicode("").tag(sync=True)
+    experiment_id = traitlets.Unicode("").tag(sync=True)
+
+    PANEL_NAMES = frozenset({"model", "parameters", "projection", "limits", "noise", "layers", "editor", "export", "comparison", "phase_plane", "time_series", "sweep"})
+
+    @traitlets.validate("panels")
+    def _validate_panels(self, proposal):
+        values = proposal["value"]
+        if len(set(values)) != len(values) or not set(values) <= self.PANEL_NAMES:
+            raise traitlets.TraitError(f"Invalid panels: {values!r}")
+        return values
 
     _DISPLAY_MODES = frozenset({"full", "phase_plane"})
 
@@ -99,7 +123,15 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             self._model_instance = model
             kwargs.setdefault("model_name", model.name)
         super().__init__(**kwargs)
-        self._update_model()
+        if kwargs.get("model_spec") is not None:
+            self.set_model_spec(kwargs["model_spec"])
+        else:
+            self._update_model()
+        self.experiment_id = self.model_id
+        for name in ("params", "xlim", "ylim", "x0", "y0", "display", "clamped",
+                     "state_names", "param_info", "integrator", "noise_enable", "noise_sigma"):
+            if name in kwargs:
+                setattr(self, name, {**self.params, **kwargs[name]} if name == "params" else kwargs[name])
         # Register handler for custom JS → Python messages (e.g. TikZ export)
         self.on_msg(self._on_custom_msg)
 
@@ -155,7 +187,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
         # Set default display limits from state variable ranges
         state_vars = spec.get("state_vars", {})
         if state_names:
-            first = state_names[0]
+            first = state_names[display[0]]
             lo, hi = state_vars[first]["range"]
             self.xlim = [lo, hi]
             self.x0 = state_vars[first]["default"]
@@ -174,6 +206,29 @@ class PhasePlaneWidget(anywidget.AnyWidget):
                 lo, hi = state_vars[name]["range"]
                 clamped.append((lo + hi) / 2.0)
         self.clamped = clamped
+        self.integrator = spec.get("integrator", "rk4")
+        self.noise_sigma = spec.get("noise_per_var") or [0.0] * n
+        self.noise_enable = spec.get("noise_per_var") is not None
+
+    def view(self, panels, *, parameters=None, layout="horizontal"):
+        """Create a separately displayable view sharing this experiment."""
+        return ExperimentView(experiment=self, panels=list(panels),
+                              visible_parameters=parameters, panel_layout=layout)
+
+    def explore(self, presentation="figure", *, parameters=None):
+        """Create a linked notebook view with a picker for all five layouts.
+
+        Layout switches retain experiment state. Leaving a running sweep cancels
+        it; parameters, frozen references and completed results are preserved.
+        """
+        return ExperimentView(experiment=self, panels=["phase_plane"],
+                              presentation=presentation, visible_parameters=parameters,
+                              view_switcher=True)
+
+    def present(self, presentation="figure", *, parameters=None):
+        """Create a composed view of this experiment (experimental layout API)."""
+        return ExperimentView(experiment=self, panels=["phase_plane"],
+                              presentation=presentation, visible_parameters=parameters)
 
     # ── Python-side helpers (for programmatic use / validation) ──
 
@@ -201,6 +256,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
         title: str = "Phase Plane Widget",
         *,
         on_render_js: str = "",
+        views: list[dict] | None = None,
     ):
         """Export the widget to a self-contained HTML file.
 
@@ -217,6 +273,9 @@ class PhasePlaneWidget(anywidget.AnyWidget):
         on_render_js : str
             Optional JavaScript snippet executed after the widget renders.
             Useful for auto-opening UI panels (e.g. the live editor).
+        views : list[dict], optional
+            Separate panel configurations sharing this experiment on one page.
+            Each dict accepts panels, visible_parameters and panel_layout.
         """
         js_code = self._esm
         css_code = self._css
@@ -242,23 +301,45 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "trajectory": self.trajectory,
             "sweep_results": self.sweep_results,
             "sweep_fixed_points": self.sweep_fixed_points,
-            "sweep_param": "",
+            "sweep_param": self.sweep_param,
             "sweep_running": False,
+            "sweep_metadata": self.sweep_metadata,
             "model_spec": self.model_spec,
             "display": list(self.display) if self.display else [0, 1],
             "clamped": list(self.clamped) if self.clamped else None,
             "integrator": self.integrator,
             "noise_enable": self.noise_enable,
             "noise_sigma": self.noise_sigma,
+            "noise_seed": self.noise_seed,
+            "reference_trajectory": self.reference_trajectory,
+            "reference_scene": self.reference_scene,
+            "show_reference": self.show_reference,
+            "reference_metadata": self.reference_metadata,
+            "trajectory_fraction": self.trajectory_fraction,
             "display_mode": self.display_mode,
+            "panels": self.panels,
+            "visible_parameters": self.visible_parameters,
+            "panel_layout": self.panel_layout,
+            "presentation": self.presentation,
+            "view_switcher": self.view_switcher,
         }
 
         extra_js = f"\n{on_render_js}\n" if on_render_js else ""
+        if views is not None:
+            for config in views:
+                presentation = config.get("presentation", "panels")
+                if presentation not in self.traits()["presentation"].values:
+                    raise ValueError(f"Invalid presentation: {presentation!r}")
+                panels = config.get("panels", [])
+                if (presentation == "panels" and not panels) or len(set(panels)) != len(panels) or not set(panels) <= self.PANEL_NAMES:
+                    raise ValueError(f"Invalid view panels: {config!r}")
+        view_config = json.dumps(views).replace("<", "\\u003c")
 
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{title}</title>
     <style>
 {css_code}
@@ -276,16 +357,31 @@ const mockModel = {{
   _data: initialState,
   _callbacks: {{}},
   get(name) {{ return this._data[name]; }},
-  set(name, value) {{ this._data[name] = value; }},
+  set(name, value) {{
+    if (Object.is(this._data[name], value)) return;
+    this._data[name] = value;
+    for (const cb of [...(this._callbacks['change:' + name] || [])]) cb(this, value);
+  }},
   save_changes() {{}},
   on(event, cb) {{
     if (!this._callbacks[event]) this._callbacks[event] = [];
     this._callbacks[event].push(cb);
   }},
+  off(event, cb) {{ this._callbacks[event] = (this._callbacks[event] || []).filter(fn => fn !== cb); }},
   send() {{}},
 }};
 
-render({{ model: mockModel, el: document.getElementById('ppw-root') }});
+const root = document.getElementById('ppw-root');
+const viewConfigs = {view_config};
+if (viewConfigs === null) {{
+  render({{ model: mockModel, el: root }});
+}} else {{
+  for (const config of viewConfigs) {{
+    const el = document.createElement('div');
+    root.appendChild(el);
+    render({{ model: mockModel, el, options: {{get: name => config[name]}} }});
+  }}
+}}
 {extra_js}
 </script>
 </body>
@@ -506,3 +602,23 @@ render({{ model: mockModel, el: document.getElementById('ppw-root') }});
                 )
             finally:
                 os.unlink(tmppath)
+
+
+class ExperimentView(anywidget.AnyWidget):
+    """A presentation of an existing PhasePlaneWidget's shared state."""
+
+    _esm = PhasePlaneWidget._esm
+    _css = PhasePlaneWidget._css
+    experiment = traitlets.Instance(PhasePlaneWidget).tag(sync=True, **ipywidgets.widget_serialization)
+    view_switcher = traitlets.Bool(False).tag(sync=True)
+    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson"], default_value="panels").tag(sync=True)
+    panels = traitlets.List(traitlets.Unicode()).tag(sync=True)
+    visible_parameters = traitlets.List(traitlets.Unicode(), allow_none=True, default_value=None).tag(sync=True)
+    panel_layout = traitlets.Enum(["horizontal", "vertical"], default_value="horizontal").tag(sync=True)
+
+    @traitlets.validate("panels")
+    def _validate_panels(self, proposal):
+        values = proposal["value"]
+        if not values or len(set(values)) != len(values) or not set(values) <= PhasePlaneWidget.PANEL_NAMES:
+            raise traitlets.TraitError(f"Invalid panels: {values!r}")
+        return values

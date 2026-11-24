@@ -136,6 +136,8 @@ def main():
         print(f"Generated {out_path.name} ({out_path.stat().st_size:,} bytes)")
 
     build_custom_demo()
+    from build_design_gallery import build_design_gallery
+    build_design_gallery()
     print("Done.")
 
 

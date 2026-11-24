@@ -19,7 +19,7 @@ const nerdamer = (() => {
 //var nerdamerBigDecimal = typeof nerdamerBigDecimal !== 'undefined' ? nerdamerBigDecimal : require('big.js');
 
 var nerdamer = (function (imports) {
-    "use strict"; 
+    "use strict";
 
 //version ======================================================================
     var version = '1.1.13';
@@ -309,7 +309,7 @@ var nerdamer = (function (imports) {
      * Generates an object with known variable value for evaluation
      * @param {String} variable
      * @param {any} value Any stringifyable object
-     * @returns {Object} 
+     * @returns {Object}
      */
     var knownVariable = function (variable, value) {
         var o = {};
@@ -717,8 +717,8 @@ var nerdamer = (function (imports) {
 
     /**
      * Checks to see if two arrays are equal
-     * @param {Array} arr1 
-     * @param {Array} arr2 
+     * @param {Array} arr1
+     * @param {Array} arr2
      */
     var arrayEqual = function (arr1, arr2) {
         arr1.sort();
@@ -994,7 +994,7 @@ var nerdamer = (function (imports) {
 
     /**
      * Gets all the variables in an array of Symbols
-     * @param {Symbol[]} arr 
+     * @param {Symbol[]} arr
      */
     var arrayGetVariables = function (arr) {
         var vars = variables(arr[0], null, null, true);
@@ -2233,7 +2233,7 @@ var nerdamer = (function (imports) {
      * @param {int} useGroup
      * @returns {String}
      */
-    function text(obj, option, useGroup, decp) { 
+    function text(obj, option, useGroup, decp) {
         var asHash = option === 'hash',
                 //whether to wrap numbers in brackets
                 wrapCondition = undefined,
@@ -2507,7 +2507,7 @@ var nerdamer = (function (imports) {
     }
     /**
      * Calculates prime factors for a number. It first checks if the number
-     * is a prime number. If it's not then it will calculate all the primes 
+     * is a prime number. If it's not then it will calculate all the primes
      * for that number.
      * @param {int} num
      * @returns {Array}
@@ -2802,7 +2802,7 @@ var nerdamer = (function (imports) {
     //Aliases
     Expression.prototype.toTeX = Expression.prototype.latex;
 
-    
+
 //Scientific ===================================================================
     /*
      * Javascript has the toExponential method but this allows you to work with string and therefore any number of digits of your choosing
@@ -3113,7 +3113,7 @@ var nerdamer = (function (imports) {
             var dec = whole.toString() + '.' + narr.join('');
             return sign + dec;
         },
-        toDecimal: function (prec) { 
+        toDecimal: function (prec) {
             prec = prec || Settings.PRECISION;
             if(prec) {
                 return this.decimal(prec);
@@ -3335,7 +3335,7 @@ var nerdamer = (function (imports) {
             var rounded = _.parse(nround(root));
             // Reverse the root
             var e = evaluate(_.pow(rounded, _.parse(n)));
-            // If the rounded root equals the original number then we're good 
+            // If the rounded root equals the original number then we're good
             if(e.equals(_.parse(this.multiplier))) {
                 return rounded;
             }
@@ -3348,7 +3348,7 @@ var nerdamer = (function (imports) {
          */
         isToNth: function (n) {
             // Start by check in the multiplier for squareness
-            // First get the root but round it because currently we still depend 
+            // First get the root but round it because currently we still depend
             var root = this.getNth(n);
             var nthMultiplier = isInt(root);
             var nthPower;
@@ -4756,7 +4756,7 @@ var nerdamer = (function (imports) {
             atan: function (r, i) {
                 // Handle i and -i
                 if(r.equals(0) && (i.equals(1) || i.equals(-1))) {
-                    // Just copy Wolfram Alpha for now. The parenthesis 
+                    // Just copy Wolfram Alpha for now. The parenthesis
                     return _.parse(`${Symbol.infinity()}*${Settings.IMAGINARY}*${i}`);
                 }
                 var a, b, c, symbol;
@@ -6258,7 +6258,7 @@ var nerdamer = (function (imports) {
              if(e.charAt(i) === ' ')
              return i;
              }
-             
+
              return L; //assume the end of the string instead
              };
              */
@@ -7021,7 +7021,7 @@ var nerdamer = (function (imports) {
                 var next_is_array = isArray(next);
                 var next_is_minus = next === '-';
 
-                // Remove redundant plusses 
+                // Remove redundant plusses
                 if(e === '^') {
                     if(next === '+') {
                         arr.shift();
@@ -7047,7 +7047,7 @@ var nerdamer = (function (imports) {
 
                     if(before === '*') {
                         narr.pop();
-                        // For simplicity we just pop it. 
+                        // For simplicity we just pop it.
                         before_last = narr.pop();
                     }
                     // Implied multiplication
@@ -7057,7 +7057,7 @@ var nerdamer = (function (imports) {
 
                     narr.push(before_last, '/', last, e);
 
-                    // Remove the negative sign from the power 
+                    // Remove the negative sign from the power
                     if(next_is_array) {
                         next.shift();
                     }
@@ -7557,7 +7557,7 @@ var nerdamer = (function (imports) {
             if(!isSymbol(symbol)) {
                 symbol = _.parse(symbol);
             }
-            
+
             // Exit early for EX
             if(symbol.group === EX) {
                 return _.symfunction(SQRT, [symbol]);
@@ -8801,7 +8801,7 @@ var nerdamer = (function (imports) {
                         [a, b] = [b, a];
                     }
                 }
-                
+
                 //no need to waste time on zeroes
                 if(a.multiplier.equals(0))
                     return b;
@@ -9112,7 +9112,7 @@ var nerdamer = (function (imports) {
                     a.unit = b;
                     return result;
                 }
-                
+
                 //if it has units then just forward that problem to the unit module
                 if(a.unit || b.unit) {
                     return _.Unit.multiply(a, b);
@@ -9563,7 +9563,7 @@ var nerdamer = (function (imports) {
                 if(a.unit || b.unit) {
                     return _.Unit.pow(a, b);
                 }
-                
+
                 // Handle abs
                 if(a.group === FN && a.fname === ABS && even(b)) {
                     var m = a.multiplier.clone();
@@ -9571,7 +9571,7 @@ var nerdamer = (function (imports) {
                     raised.multiplier = m;
                     return raised;
                 }
-                
+
                 // Handle infinity
                 if(a.isInfinity || b.isInfinity) {
                     if(a.isInfinity && b.isInfinity)
@@ -9771,7 +9771,7 @@ var nerdamer = (function (imports) {
                         result = _.multiply(a1, _.add(b1, c1));
                         result = _.expand(_.parse(result));
                         /*
-                         }   
+                         }
                          */
                     }
                     else {
@@ -10771,7 +10771,7 @@ var nerdamer = (function (imports) {
                         var u = parse_next();
                     }
                     var f = parse_next(); // function
-                    
+
                     // get the variable of integration
                     var dx = next().value;
                     // skip the comma
@@ -10803,7 +10803,7 @@ var nerdamer = (function (imports) {
                         var u = parse_next();
                     }
                     var f = parse_next(); // function
-                    
+
                     // get the variable of integration
                     var dx = next().value;
                     // skip the comma
@@ -11864,7 +11864,7 @@ var nerdamer = (function (imports) {
             if(arg_array) {
                 // Fix for issue #546
                 // Disable argument checking since it's a bit presumptuous.
-                // Consider f(x) = 5; If I explicitely pass in an argument array contain x 
+                // Consider f(x) = 5; If I explicitely pass in an argument array contain x
                 // this check will fail and complain since the function doesn't contain x.
                 /*
                  for (var i = 0; i < args.length; i++) {
@@ -12513,7 +12513,6 @@ var nerdamer = (function (imports) {
 
   return nerdamer;
 })();
-
 const STABILITY_COLORS = {
   stable_node: "#4CAF50",
   stable_focus: "#8BC34A",
@@ -12674,6 +12673,12 @@ const C2S = (function() {
             svgAttr : "stroke-miterlimit",
             canvas : 10,
             svg : 4,
+            apply : "stroke"
+        },
+        "_lineDash":{
+            svgAttr : "stroke-dasharray",
+            canvas : "none",
+            svg : "none",
             apply : "stroke"
         },
         "lineWidth":{
@@ -13238,6 +13243,13 @@ const C2S = (function() {
     /**
      * Sets the stroke property on the current element
      */
+    // Local extension: preserve dashed reference paths in offline SVG exports.
+    ctx.prototype.setLineDash = function(segments) {
+        this._lineDash = segments.length ? segments.join(' ') : 'none';
+    };
+    ctx.prototype.getLineDash = function() {
+        return this._lineDash === 'none' ? [] : this._lineDash.split(' ').map(Number);
+    };
     ctx.prototype.stroke = function(){
         if(this.__currentElement.nodeName === "path") {
             this.__currentElement.setAttribute("paint-order", "fill stroke markers");
@@ -13668,7 +13680,6 @@ const C2S = (function() {
 // ═══════════════════════════════════════════════════════════════
 //  MODEL DEFINITIONS  (all computation runs client-side)
 // ═══════════════════════════════════════════════════════════════
-
 function _sigmoid(x, k, theta) {
   return 1.0 / (1.0 + expClamp(-k * (x - theta)));
 }
@@ -13869,8 +13880,7 @@ function compileModelSpec(spec) {
     try {
       compiledEqs[name] = nerdamer(exprStr).buildFunction(allArgNames);
     } catch (e) {
-      console.warn('Failed to compile equation for', name, e);
-      compiledEqs[name] = () => 0;
+      throw new Error(`Cannot compile equation for ${name}: ${e.message}`);
     }
   }
 
@@ -13961,8 +13971,7 @@ function makeCompiledProjectedRHS(modelEntry, displayIdx, clamped) {
       const fn = nerdamer(exprStr).buildFunction(allArgs);
       projectedFns.push(fn);
     } catch (e) {
-      console.warn('Failed to build projected RHS for', stateVars[displayIdx[idx]], e);
-      projectedFns.push(() => 0);
+      throw new Error(`Cannot compile projected equation for ${stateVars[idx]}: ${e.message}`);
     }
   }
 
@@ -14005,20 +14014,16 @@ function linspace(a, b, n) {
  *  @param {number[]} clamped — full N-dim state vector with clamped values
  *  @returns {Function} f_proj(t, projState, params) → derivatives of displayed vars
  */
-function makeProjectedRHS(modelName, displayIdx, clamped, spec = null) {
-  // Use compiled projected RHS for custom models
-  if (modelName === 'custom' && spec) {
-    try {
-      const entry = compileModelSpec(spec);
-      return makeCompiledProjectedRHS(entry, displayIdx, clamped);
-    } catch (e) {
-      console.warn('Custom model compilation failed, falling back', e);
-    }
-  }
-
-  // Built-in model fallback
+function resolveModel(modelName, spec) {
+  if (modelName === 'custom') return compileModelSpec(spec);
   const def = MODELS[modelName];
   if (!def) throw new Error('Unknown model: ' + modelName);
+  return def;
+}
+
+function makeProjectedRHS(modelName, displayIdx, clamped, spec = null, resolved = null) {
+  const def = resolved || resolveModel(modelName, spec);
+  if (modelName === 'custom') return makeCompiledProjectedRHS(def, displayIdx, clamped);
   const fullF = def.f;
   const n = (def.stateVars || def.stateNames || []).length;
   const clampedCopy = [...clamped];
@@ -14088,11 +14093,11 @@ function rk4(modelName, y0, t0, tf, h, params) {
 }
 
 /** Box-Muller transform for standard normal random numbers. */
-function randn() {
-  let u1 = Math.random();
-  let u2 = Math.random();
-  while (u1 === 0) u1 = Math.random();
-  while (u2 === 0) u2 = Math.random();
+function randn(random = Math.random) {
+  let u1 = random();
+  let u2 = random();
+  while (u1 === 0) u1 = random();
+  while (u2 === 0) u2 = random();
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
@@ -14100,7 +14105,12 @@ function randn() {
  *  noiseSigma is an array of per-variable noise strengths (same length as state).
  *  Returns array of [t, v0, v1, ...] rows.
  *  Max 50,000 step budget.  */
-function heun(modelName, y0, t0, tf, h, params, noiseSigma) {
+function heun(modelName, y0, t0, tf, h, params, noiseSigma, seed = 0) {
+  let rngState = seed >>> 0;
+  const random = () => {
+    rngState = (Math.imul(rngState, 1664525) + 1013904223) >>> 0;
+    return (rngState + 0.5) / 4294967296;
+  };
   const f = typeof modelName === 'object' ? modelName.f : MODELS[modelName].f;
   const dim = y0.length;
   const results = [[t0, ...y0]];
@@ -14114,7 +14124,7 @@ function heun(modelName, y0, t0, tf, h, params, noiseSigma) {
     // Wiener increments: dW ~ Normal(0, sqrt(dt))
     const dW = new Array(dim);
     for (let i = 0; i < dim; i++) {
-      dW[i] = sqrtDt * randn();
+      dW[i] = sqrtDt * randn(random);
     }
     // Predictor: Ytilde = Yn + f(Yn)*dt + sigma*dW
     const fn = f(t, y, params);
@@ -14138,7 +14148,7 @@ function simulate(modelName, state0, t0, tf, dt, params, settings) {
   const integrator = (settings && settings.integrator) || 'rk4';
   if (integrator === 'heun') {
     const noiseSigma = (settings && settings.noiseSigma) || state0.map(() => 0);
-    return heun(modelName, state0, t0, tf, dt, params, noiseSigma);
+    return heun(modelName, state0, t0, tf, dt, params, noiseSigma, settings?.seed || 0);
   }
   return rk4(modelName, state0, t0, tf, dt, params);
 }
@@ -14624,18 +14634,19 @@ function runParameterSweep(f, modelName, sweepParam, params, vmin, vmax, n, xlim
 // ═══════════════════════════════════════════════════════════════
 //  CANVAS RENDERING  (unchanged coordinate helpers & draw calls)
 // ═══════════════════════════════════════════════════════════════
-
 function worldToScreen(wx, wy, xlim, ylim, w, h) {
-  return [((wx - xlim[0]) / (xlim[1] - xlim[0])) * w, h - ((wy - ylim[0]) / (ylim[1] - ylim[0])) * h];
+  const pad = 42;
+  return [pad + ((wx - xlim[0]) / (xlim[1] - xlim[0])) * (w - 2 * pad), h - pad - ((wy - ylim[0]) / (ylim[1] - ylim[0])) * (h - 2 * pad)];
 }
 
 function screenToWorld(sx, sy, xlim, ylim, w, h) {
-  return [xlim[0] + (sx / w) * (xlim[1] - xlim[0]), ylim[0] + ((h - sy) / h) * (ylim[1] - ylim[0])];
+  const pad = 42;
+  return [xlim[0] + ((sx - pad) / (w - 2 * pad)) * (xlim[1] - xlim[0]), ylim[0] + ((h - pad - sy) / (h - 2 * pad)) * (ylim[1] - ylim[0])];
 }
 
-function drawAxes(ctx, w, h, xlim, ylim, xlabel, ylabel) {
-  const pad = 30;
-  ctx.strokeStyle = "#333";
+function drawAxes(ctx, w, h, xlim, ylim, xlabel, ylabel, theme = DEFAULT_PLOT_THEME) {
+  const pad = 42;
+  ctx.strokeStyle = theme.text;
   ctx.lineWidth = 1;
   const zeroY = worldToScreen(0, 0, xlim, ylim, w, h)[1];
   if (zeroY >= pad && zeroY <= h - pad) {
@@ -14645,7 +14656,7 @@ function drawAxes(ctx, w, h, xlim, ylim, xlabel, ylabel) {
   if (zeroX >= pad && zeroX <= w - pad) {
     ctx.beginPath(); ctx.moveTo(zeroX, pad); ctx.lineTo(zeroX, h - pad); ctx.stroke();
   }
-  ctx.strokeStyle = "#e9ecef"; ctx.lineWidth = 0.5;
+  ctx.strokeStyle = theme.grid; ctx.lineWidth = 0.5;
   const nx = 5, ny = 5;
   for (let i = 0; i <= nx; i++) {
     const x = xlim[0] + (i / nx) * (xlim[1] - xlim[0]);
@@ -14657,7 +14668,7 @@ function drawAxes(ctx, w, h, xlim, ylim, xlabel, ylabel) {
     const sy = worldToScreen(0, y, xlim, ylim, w, h)[1];
     ctx.beginPath(); ctx.moveTo(pad, sy); ctx.lineTo(w - pad, sy); ctx.stroke();
   }
-  ctx.fillStyle = "#666"; ctx.font = "10px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillStyle = theme.muted; ctx.font = "10px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
   for (let i = 0; i <= nx; i++) {
     const x = xlim[0] + (i / nx) * (xlim[1] - xlim[0]);
     ctx.fillText(x.toFixed(1), worldToScreen(x, ylim[0], xlim, ylim, w, h)[0], h - pad + 2);
@@ -14692,70 +14703,994 @@ function drawArrow(ctx, fromX, fromY, toX, toY, color = "#bbb", headLen = 4) {
 // ═══════════════════════════════════════════════════════════════
 //  MAIN RENDER FUNCTION
 // ═══════════════════════════════════════════════════════════════
+const EXPERIMENT_CACHE = Symbol.for('trajecturtle.experiment-cache');
+const EXPERIMENT_SESSION = Symbol.for('trajecturtle.experiment-session');
+const RESET_KEYS = ['model_spec','model_name','param_info','state_names','display','clamped','params','x0','y0','xlim','ylim','t_max','noise_seed','integrator','noise_enable','noise_sigma'];
 
-export function render({ model, el }) {
-  // Detect standalone mode (no real anywidget kernel behind the model)
-  const isStandalone = model._isMock === true || typeof model.save_changes !== "function";
+export function experimentSession(model) {
+  return model[EXPERIMENT_SESSION] ||= {
+    baseline: Object.fromEntries(RESET_KEYS.map(key => [key, structuredClone(model.get(key))])),
+  };
+}
 
-  const displayMode = model.get("display_mode") || "full";
+export function resetExperiment(model) {
+  for (const [key, value] of Object.entries(experimentSession(model).baseline)) model.set(key, structuredClone(value));
+  model.set('reference_trajectory', []);
+  model.set('reference_scene', {});
+  model.set('reference_metadata', {});
+  model.set('trajectory_fraction', 1);
+}
 
-  // ── Create DOM ──
-  el.innerHTML = `
-    <div class="ppw-widget${displayMode === 'phase_plane' ? ' ppw-phase-only' : ''}">
-      <div class="ppw-controls">
-        <div class="ppw-control-row">
-          <label class="ppw-label">Model:
-            <select class="ppw-model-select"></select>
-          </label>
-        </div>
-        <div class="ppw-params"></div>
-        <div class="ppw-control-row ppw-state-selector" style="display:none">
-          <label class="ppw-label">X axis:
-            <select class="ppw-state-x"></select>
-          </label>
-          <label class="ppw-label">Y axis:
-            <select class="ppw-state-y"></select>
-          </label>
-        </div>
-        <div class="ppw-clamped-sliders"></div>
-        <div class="ppw-control-row ppw-limits">
-          <label class="ppw-label">X:
-            <input class="ppw-xmin" type="number" step="0.1">
-            <input class="ppw-xmax" type="number" step="0.1">
-          </label>
-          <label class="ppw-label">Y:
-            <input class="ppw-ymin" type="number" step="0.1">
-            <input class="ppw-ymax" type="number" step="0.1">
-          </label>
-          <label class="ppw-label">Tmax:
-            <input class="ppw-tmax" type="number" step="10" min="1">
-          </label>
-        </div>
-        <div class="ppw-noise-section">
-          <div class="ppw-control-row">
-            <label><input type="checkbox" class="ppw-noise-enable"> Enable noise</label>
-            <label>Integrator:
-              <select class="ppw-integrator-select">
-                <option value="rk4">RK4</option>
-                <option value="heun">Heun</option>
-              </select>
-            </label>
-          </div>
-          <div class="ppw-noise-sliders"></div>
-        </div>
-        <div class="ppw-control-row ppw-toggles">
-          <label><input type="checkbox" class="ppw-show-null" checked> Nullclines</label>
-          <label><input type="checkbox" class="ppw-show-vf" checked> Vector Field</label>
-          <label><input type="checkbox" class="ppw-show-traj" checked> Trajectory</label>
-          <label><input type="checkbox" class="ppw-show-fp" checked> Fixed Points</label>
-          <button class="ppw-editor-toggle">✏️ Custom Model</button>
-        </div>
-        <div class="ppw-export-row">
-          <button class="ppw-export-svg">Export SVG</button>
-          <button class="ppw-export-tikz">Export TikZ</button>
-        </div>
-      </div>
-      <div class="ppw-editor-panel">
+export function referenceIdentity(model) {
+  return JSON.stringify([model.get('model_name'), model.get('model_spec'), model.get('state_names')]);
+}
+
+export function sweepIdentity(model) {
+  return JSON.stringify(RESET_KEYS.map(key => model.get(key)));
+}
+
+export function computeExperiment(model) {
+  try {
+    return computeExperimentState(model);
+  } catch (error) {
+    delete model[EXPERIMENT_CACHE];
+    for (const key of ['nullcline_x', 'nullcline_y', 'vector_field', 'fixed_points', 'trajectory']) model.set(key, []);
+    throw error;
+  }
+}
+
+function computeExperimentState(model) {
+  experimentSession(model);
+  const metadata = model.get('reference_metadata');
+  const scene = model.get('reference_scene');
+  if (((model.get('reference_trajectory') || []).length || scene?.display) &&
+      (metadata?.identity !== referenceIdentity(model) || (scene?.display && JSON.stringify(scene.display) !== JSON.stringify(model.get('display'))))) {
+    model.set('reference_trajectory', []);
+    model.set('reference_scene', {});
+    model.set('reference_metadata', {});
+  }
+  const modelName = model.get("model_name");
+  const params = model.get("params");
+  const xlim = model.get("xlim");
+  const ylim = model.get("ylim");
+  const tMax = model.get("t_max");
+  const x0 = model.get("x0");
+  const y0 = model.get("y0");
+
+  const def = resolveModel(modelName, model.get('model_spec'));
+  const stateVars = def.stateVars || def.stateNames || [];
+  const n = stateVars.length;
+
+  // Display indices and clamped (non-displayed) state variable values
+  const display = model.get("display") || def.display || [0, 1];
+  let clamped = model.get("clamped");
+  if (!clamped || clamped.length !== n) {
+    clamped = stateVars.map((_, i) => {
+      const lims = (def.defaultLims && def.defaultLims[i]) || [-1, 1];
+      return (lims[0] + lims[1]) / 2;
+    });
+    model.set("clamped", clamped);
+  }
+
+  // Projected RHS for phase-plane computations
+  const _spec4proj = modelName === 'custom' ? model.get('model_spec') : null;
+  const cache = model[EXPERIMENT_CACHE] ||= {};
+  const geometryKey = JSON.stringify([modelName, _spec4proj, params, display, clamped, xlim, ylim]);
+  if (cache.geometry !== geometryKey) {
+    const fProj = makeProjectedRHS(modelName, display, clamped, _spec4proj, def);
+    const [ncX, ncY] = computeNullclines(fProj, params, xlim, ylim, 60);
+    model.set("nullcline_x", ncX);
+    model.set("nullcline_y", ncY);
+    model.set("vector_field", computeVectorField(fProj, params, xlim, ylim, 12));
+    model.set("fixed_points", findFixedPoints(fProj, params, xlim, ylim, 25));
+    cache.geometry = geometryKey;
+  }
+
+  // Trajectory: integrate the full N-dimensional system
+  const fullState0 = [...clamped];
+  fullState0[display[0]] = x0;
+  if (display.length > 1) fullState0[display[1]] = y0;
+  const integrator = model.get('integrator') || 'rk4';
+  const noiseSigma = (integrator === 'heun' && model.get('noise_enable'))
+                     ? model.get('noise_sigma') : null;
+  const settings = { integrator, noiseSigma, seed: model.get('noise_seed') || 0 };
+  const trajectoryKey = JSON.stringify([modelName, _spec4proj, params, fullState0, tMax, settings]);
+  if (cache.trajectory !== trajectoryKey) {
+    const trajDef = (modelName === 'custom' && def && def.f) ? def : modelName;
+    const traj = simulate(trajDef, fullState0, 0, tMax, 0.01, params, settings);
+    const step = Math.max(1, Math.ceil(traj.length / 2000));
+    const trajDisplay = traj.filter((_, i) => i % step === 0 || i === traj.length - 1);
+    model.set("trajectory", trajDisplay);
+    cache.trajectory = trajectoryKey;
+  }
+  return def;
+}
+// One controller per canonical experiment model, independent of mounted panels.
+const EXPERIMENT_CONTROLLER = Symbol.for('trajecturtle.experiment-controller');
+const COMPUTATION_INPUTS = ['model_spec', 'model_name', 'params', 'state_names', 'display', 'clamped', 'x0', 'y0', 'xlim', 'ylim', 't_max', 'integrator', 'noise_enable', 'noise_sigma', 'noise_seed'];
+const PRESENTATION_INPUTS = ['param_info', 'show_nullclines', 'show_vector_field', 'show_trajectory', 'show_fixed_points', 'trajectory_fraction', 'reference_trajectory', 'reference_scene', 'show_reference', 'reference_metadata', 'sweep_results', 'sweep_fixed_points', 'sweep_param'];
+
+export function acquireExperiment(model) {
+  const controller = model[EXPERIMENT_CONTROLLER] ||= createExperimentController(model);
+  controller.retain();
+  return controller;
+}
+
+function createExperimentController(model) {
+  const subscribers = new Set();
+  const listeners = [];
+  let references = 0, pending = null, computing = false, disposed = false;
+  let sweepJob = null, playback = null;
+  const controller = {
+    model, error: null, sweep: { progress: 0, status: '' },
+    get playing() { return !!playback; },
+    retain() { references++; },
+    subscribe(callback) { subscribers.add(callback); return () => subscribers.delete(callback); },
+    release() {
+      if (--references > 0) return;
+      clearTimeout(pending);
+      controller.cancelSweep();
+      controller.pause();
+      disposed = true;
+      for (const [event, callback] of listeners) model.off(event, callback);
+      subscribers.clear();
+      delete model[EXPERIMENT_CONTROLLER];
+    },
+    commit(values) {
+      if ('trajectory_fraction' in values) controller.pause();
+      for (const [key, value] of Object.entries(values)) model.set(key, value);
+      if (Object.keys(values).some(key => COMPUTATION_INPUTS.includes(key))) controller.refresh();
+      else emit();
+      sync();
+    },
+    refresh() {
+      clearTimeout(pending); pending = null;
+      if (disposed || computing) return;
+      computing = true;
+      try {
+        controller.definition = computeExperiment(model);
+        controller.error = null;
+        if (model.get('sweep_metadata')?.identity && model.get('sweep_metadata').identity !== sweepIdentity(model)) {
+          controller.cancelSweep();
+          model.set('sweep_results', []); model.set('sweep_fixed_points', []);
+          model.set('sweep_metadata', {});
+          controller.sweep.status = 'Configuration changed — run sweep again';
+        }
+      } catch (error) {
+        controller.definition = null;
+        controller.error = error;
+        controller.cancelSweep();
+        model.set('sweep_results', []); model.set('sweep_fixed_points', []);
+      } finally {
+        computing = false;
+      }
+      emit(); sync();
+    },
+    reset() {
+      controller.pause();
+      resetExperiment(model);
+      controller.refresh();
+    },
+    captureReference() {
+      controller.commit({
+        reference_metadata: { identity: referenceIdentity(model), params: structuredClone(model.get('params')), seed: model.get('noise_seed'), captured_at: new Date().toISOString() },
+        reference_scene: Object.fromEntries(['nullcline_x', 'nullcline_y', 'fixed_points', 'display', 'clamped', 'xlim', 'ylim', 'state_names'].map(key => [key, structuredClone(model.get(key) || [])])),
+        reference_trajectory: (model.get('trajectory') || []).map(row => [...row]),
+        show_reference: true,
+      });
+    },
+    selectModel(name) {
+      try {
+        const def = resolveModel(name, model.get('model_spec'));
+        const display = def.display || [0, 1];
+        const clamped = def.stateVars.map((_, i) => {
+          const [lo, hi] = def.defaultLims?.[i] || [-1, 1]; return (lo + hi) / 2;
+        });
+        const xlim = def.defaultLims?.[display[0]] || def.defaultXlim;
+        const ylim = def.defaultLims?.[display[1]] || def.defaultYlim;
+        controller.commit({ model_name: name, param_info: def.paramInfo, state_names: def.stateVars,
+          params: { ...def.defaultParams }, display, clamped, xlim: [...xlim], ylim: [...ylim],
+          x0: xlim[0] + .1 * (xlim[1] - xlim[0]), y0: ylim[0] + .1 * (ylim[1] - ylim[0]),
+          reference_trajectory: [], reference_scene: {}, reference_metadata: {},
+        });
+      } catch (error) { controller.error = error; emit(); }
+    },
+    applySpec(spec) {
+      const def = resolveModel('custom', spec);
+      const display = spec.display || [0, Math.min(1, def.dim - 1)];
+      const params = Object.fromEntries(Object.entries(def.defaultParams).map(([key, value]) => [key, model.get('params')?.[key] ?? value]));
+      const clamped = def.stateVars.map((name, i) => spec.state_vars[name].default ?? ((def.defaultLims[i][0] + def.defaultLims[i][1]) / 2));
+      controller.commit({ model_spec: spec, model_name: 'custom', param_info: def.paramInfo,
+        state_names: def.stateVars, params, display, clamped,
+        xlim: [...def.defaultXlim], ylim: [...def.defaultYlim],
+      });
+    },
+    pause(owner) {
+      if (!playback || (owner && playback.owner !== owner)) return;
+      clearTimeout(playback.timer); playback = null; emit(); sync();
+    },
+    play(owner) {
+      if (playback) { controller.pause(); return; }
+      const offset = model.get('trajectory_fraction') >= 1 ? 0 : (model.get('trajectory_fraction') || 0);
+      const job = playback = { owner, start: performance.now(), timer: null };
+      function tick() {
+        if (playback !== job || disposed) return;
+        const fraction = Math.min(1, offset + (performance.now() - job.start) / 8000);
+        model.set('trajectory_fraction', fraction);
+        emit();
+        if (fraction < 1) job.timer = setTimeout(tick, 32);
+        else controller.pause();
+      }
+      tick();
+    },
+    cancelSweep(owner) {
+      if (!sweepJob || (owner && sweepJob.owner !== owner)) return;
+      clearTimeout(sweepJob.timer); sweepJob = null;
+      model.set('sweep_running', false);
+      controller.sweep.status = 'Sweep cancelled';
+      emit(); sync();
+    },
+    startSweep(config, owner) {
+      if (sweepJob || model.get('sweep_running')) return;
+      const { parameter, min, max, count } = config;
+      if (!parameter || ![min, max, count].every(Number.isFinite) || min >= max || !Number.isInteger(count) || count < 2 || count > 200) {
+        controller.sweep.status = 'Choose a parameter, increasing bounds, and 2–200 samples'; emit(); return;
+      }
+      const job = sweepJob = { owner, timer: null };
+      controller.sweep = { progress: 0, status: 'Running…' };
+      model.set('sweep_running', true);
+      function fail(error) {
+        if (sweepJob !== job) return;
+        sweepJob = null;
+        model.set('sweep_running', false);
+        model.set('sweep_results', []); model.set('sweep_fixed_points', []); model.set('sweep_metadata', {});
+        controller.error = error;
+        controller.sweep.status = `Sweep failed: ${error.message}`;
+        emit(); sync();
+      }
+      try {
+        const identity = sweepIdentity(model);
+        model.set('sweep_metadata', { identity, parameter, min, max, count });
+        const name = model.get('model_name'), spec = model.get('model_spec');
+        const def = resolveModel(name, spec), params = model.get('params');
+        const display = model.get('display') || def.display || [0, 1];
+        const clamped = model.get('clamped');
+        const xlim = model.get('xlim'), ylim = model.get('ylim');
+        const projected = makeProjectedRHS(name, display, clamped, spec, def);
+        const values = linspace(min, max, count), results = [], fixedPoints = [];
+        let index = 0;
+        function step() {
+          if (sweepJob !== job || disposed) return;
+          try {
+            if (identity !== sweepIdentity(model)) { controller.cancelSweep(); return; }
+            const end = Math.min(index + 2, values.length);
+            for (; index < end; index++) {
+              const value = values[index], p = { ...params, [parameter]: value };
+              const regime = detectRegime(name === 'custom' ? def : name, p, xlim, ylim, display, 60, .05);
+              const fps = findFixedPoints(projected, p, xlim, ylim, 15);
+              results.push({ param_value: value, regime, num_fixed_points: fps.length });
+              for (const fp of fps) fixedPoints.push([value, fp[0], fp[1], fp[2]]);
+            }
+            model.set('sweep_results', [...results]); model.set('sweep_fixed_points', [...fixedPoints]); model.set('sweep_param', parameter);
+            controller.sweep.progress = Math.round(index / values.length * 100);
+            if (index < values.length) job.timer = setTimeout(step, 0);
+            else {
+              sweepJob = null; model.set('sweep_running', false);
+              controller.sweep.status = `${count} samples complete`;
+            }
+            emit(); sync();
+          } catch (error) { fail(error); }
+        }
+        controller.error = null;
+        step();
+      } catch (error) { fail(error); }
+    },
+  };
+  function sync() { if (!disposed) model.save_changes?.(); }
+  function emit() { if (!disposed && !computing) for (const callback of [...subscribers]) callback(); }
+  function listen(key, callback) { const event = 'change:' + key; model.on(event, callback); listeners.push([event, callback]); }
+  function schedule() {
+    if (computing || disposed || pending !== null) return;
+    pending = setTimeout(() => controller.refresh(), 0);
+  }
+  for (const key of COMPUTATION_INPUTS) listen(key, schedule);
+  for (const key of PRESENTATION_INPUTS) listen(key, emit);
+  controller.refresh();
+  return controller;
+}
+// Small DOM/lifecycle primitives shared by independently mounted panels.
+let controlSequence = 0;
+function panelScope() {
+  let disposed = false;
+  const cleanups = [], timers = new Set();
+  return {
+    on(target, event, callback) {
+      target.addEventListener(event, callback);
+      cleanups.push(() => target.removeEventListener(event, callback));
+    },
+    later(callback, delay = 0) {
+      if (disposed) return null;
+      const timer = setTimeout(() => { timers.delete(timer); if (!disposed) callback(); }, delay);
+      timers.add(timer); return timer;
+    },
+    cancel(timer) { clearTimeout(timer); timers.delete(timer); },
+    cleanup(callback) { cleanups.push(callback); },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      for (const timer of timers) clearTimeout(timer);
+      for (const cleanup of cleanups.splice(0).reverse()) cleanup();
+      timers.clear();
+    },
+  };
+}
+function panelElement(doc, className, html = '') {
+  const element = doc.createElement('section');
+  element.className = className;
+  element.innerHTML = html;
+  return element;
+}
+function mountedPanel(element, scope, update = () => {}) {
+  return { element, update, dispose() { scope.dispose(); element.remove(); } };
+}
+function numberControl(doc, scope, { label, min, max, value, step = 'any', sliderClass = 'ppw-param-slider', valueClass = 'ppw-param-value', onChange, delay = 0 }) {
+  const element = doc.createElement('div'); element.className = 'ppw-param';
+  const id = 'ppw-control-' + ++controlSequence;
+  element.innerHTML = `<label for="${id}"></label><input id="${id}" type="range"><input type="number" class="ppw-param-number"><span class="ppw-input-error" role="status" hidden></span>`;
+  const title = element.querySelector('label'); title.append(doc.createTextNode(label + ': '));
+  const output = doc.createElement('span'); output.className = valueClass; title.append(output);
+  const slider = element.querySelector('[type=range]'), number = element.querySelector('[type=number]'), error = element.querySelector('[role=status]');
+  slider.className = sliderClass;
+  slider.setAttribute('aria-label', label);
+  number.setAttribute('aria-label', label + ' value');
+  for (const input of [slider, number]) { input.min = min; input.max = max; input.step = step; }
+  let timer, currentValue;
+  function update(next) {
+    slider.value = next;
+    if (next !== currentValue || doc.activeElement !== number) number.value = next;
+    if (next !== currentValue) { error.hidden = true; number.removeAttribute('aria-invalid'); }
+    currentValue = next;
+    output.textContent = Number(next).toFixed(3);
+  }
+  function commit(next) { error.hidden = true; number.removeAttribute('aria-invalid'); onChange(next); }
+  scope.on(slider, 'input', () => {
+    const next = Number(slider.value); number.value = next; output.textContent = next.toFixed(3);
+    scope.cancel(timer);
+    if (delay) timer = scope.later(() => commit(next), delay); else commit(next);
+  });
+  scope.on(number, 'change', () => {
+    const next = Number(number.value);
+    if (!number.value || !Number.isFinite(next) || next < Number(min) || next > Number(max)) {
+      error.textContent = `Enter a number between ${min} and ${max}`;
+      error.hidden = false; number.setAttribute('aria-invalid', 'true'); return;
+    }
+    scope.cancel(timer); slider.value = next; output.textContent = next.toFixed(3); commit(next);
+  });
+  update(value);
+  return { element, slider, number, update };
+}
+function downloadBlob(doc, blob, filename) {
+  const url = URL.createObjectURL(blob), anchor = doc.createElement('a');
+  anchor.href = url; anchor.download = filename; doc.body.append(anchor); anchor.click(); anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function plotTheme(element) {
+  const style = element.ownerDocument.defaultView.getComputedStyle(element);
+  const read = (token, fallback) => style.getPropertyValue(token).trim() || fallback;
+  return {
+    background: read('--ppw-plot-bg', DEFAULT_PLOT_THEME.background),
+    text: read('--ppw-text', DEFAULT_PLOT_THEME.text),
+    muted: read('--ppw-muted', DEFAULT_PLOT_THEME.muted),
+    grid: read('--ppw-grid', DEFAULT_PLOT_THEME.grid),
+    cursor: read('--ppw-accent', DEFAULT_PLOT_THEME.cursor),
+  };
+}
+
+// Drawing coordinates remain in CSS pixels; backing resolution follows devicePixelRatio.
+function canvasSurface(canvas, scope, draw, { width = 500, ratio = 1, minHeight = 0 } = {}) {
+  const ctx = canvas.getContext('2d');
+  let w = width, h = Math.max(minHeight, width * ratio);
+  function render() {
+    const available = canvas.getBoundingClientRect().width;
+    w = Math.max(180, available || width); h = Math.max(minHeight, w * ratio);
+    const parent = canvas.parentElement;
+    if (parent?.hasAttribute('data-fit-plot') && parent.clientHeight > 0) {
+      const view = canvas.ownerDocument.defaultView, style = view.getComputedStyle(parent);
+      const siblings = [...parent.children].filter(child => child !== canvas && !child.hidden);
+      const occupied = siblings.reduce((sum, child) => {
+        const css = view.getComputedStyle(child);
+        return sum + child.getBoundingClientRect().height + (parseFloat(css.marginTop) || 0) + (parseFloat(css.marginBottom) || 0);
+      }, 0);
+      h = Math.max(100, parent.clientHeight - occupied - parseFloat(style.paddingTop || 0) - parseFloat(style.paddingBottom || 0) - 4);
+    }
+    const dpr = canvas.ownerDocument.defaultView.devicePixelRatio || 1;
+    const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+    if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw(ctx, w, h, plotTheme(canvas));
+  }
+  const Observer = canvas.ownerDocument.defaultView.ResizeObserver;
+  if (Observer) { const observer = new Observer(render); observer.observe(canvas); if (canvas.parentElement) observer.observe(canvas.parentElement); scope.cleanup(() => observer.disconnect()); }
+  return { render, get width() { return w; }, get height() { return h; } };
+}
+// Rendering functions have no panel/DOM dependencies; also used by SVG export.
+const DEFAULT_PLOT_THEME = { background: '#fafafa', text: '#333', muted: '#666', grid: '#e9ecef', cursor: '#172d46' };
+function drawFrozenScene(model, ctx, w, h) {
+  if (model.get('show_reference') === false || !(model.get('reference_trajectory') || []).length) return;
+  const scene = model.get('reference_scene') || {}, display = model.get('display') || [0, 1];
+  if (display.length < 2) return;
+  const xlim = model.get('xlim'), ylim = model.get('ylim');
+  ctx.save(); ctx.beginPath(); ctx.rect(42, 42, w - 84, h - 84); ctx.clip();
+  for (const [key, color] of [['nullcline_x', '#a6b8ca'], ['nullcline_y', '#c7adb3']]) {
+    ctx.fillStyle = color;
+    for (const [x, y] of scene[key] || []) {
+      const [sx, sy] = worldToScreen(x, y, xlim, ylim, w, h);
+      ctx.beginPath(); ctx.arc(sx, sy, 2, 0, 2 * Math.PI); ctx.fill();
+    }
+  }
+  ctx.strokeStyle = '#8b929d'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
+  (model.get('reference_trajectory') || []).forEach((row, i) => {
+    const [sx, sy] = worldToScreen(row[display[0] + 1], row[display[1] + 1], xlim, ylim, w, h);
+    if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy);
+  });
+  ctx.stroke(); ctx.setLineDash([]);
+  for (const [x, y] of scene.fixed_points || []) {
+    const [sx, sy] = worldToScreen(x, y, xlim, ylim, w, h);
+    ctx.beginPath(); ctx.arc(sx, sy, 8, 0, 2 * Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPhasePlane(model, ctx, w, h, theme = DEFAULT_PLOT_THEME) {
+  const xlim = model.get("xlim");
+  const ylim = model.get("ylim");
+  const stateNames = model.get("state_names");
+  const display = model.get("display") || [0, 1];
+  const is1D = display.length === 1;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = theme.background;
+  ctx.fillRect(0, 0, w, h);
+
+  if (is1D) {
+    // 1-D mode: draw dx/dt vs x
+    drawAxes(ctx, w, h, xlim, [-2, 2], stateNames[display[0]], "d" + stateNames[display[0]] + "/dt", theme);
+  } else {
+    drawAxes(ctx, w, h, xlim, ylim, stateNames[display[0]], stateNames[display[1]], theme);
+  }
+
+  // Frozen geometry is drawn behind current data, in the current axes.
+  drawFrozenScene(model, ctx, w, h);
+
+  // Nullclines
+  if (model.get("show_nullclines")) {
+    const ncX = model.get("nullcline_x");
+    if (ncX && ncX.length > 0) {
+      ctx.fillStyle = "#2196F3";
+      for (const [wx, wy] of ncX) {
+        const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
+        ctx.beginPath(); ctx.arc(sx, sy, 1.8, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    const ncY = model.get("nullcline_y");
+    if (ncY && ncY.length > 0) {
+      ctx.fillStyle = "#f44336";
+      for (const [wx, wy] of ncY) {
+        const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
+        ctx.beginPath(); ctx.arc(sx, sy, 1.8, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
+
+  // Vector field
+  if (model.get("show_vector_field")) {
+    const vf = model.get("vector_field");
+    if (vf && vf.length > 0) {
+      for (const [wx, wy, dx, dy] of vf) {
+        const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
+        const screenDx = (dx / (xlim[1] - xlim[0])) * w;
+        const screenDy = (-dy / (ylim[1] - ylim[0])) * h;
+        const mag = Math.sqrt(screenDx * screenDx + screenDy * screenDy);
+        if (mag < 1e-10) continue;
+        const ndx = screenDx / mag, ndy = screenDy / mag;
+        const arrowLen = Math.min(14, mag * 0.3);
+        drawArrow(ctx, sx, sy, sx + ndx * arrowLen, sy + ndy * arrowLen, "#ccc", 3);
+      }
+    }
+  }
+
+  // Fixed points
+  if (model.get("show_fixed_points")) {
+    const fps = model.get("fixed_points");
+    if (fps && fps.length > 0) {
+      for (const [wx, wy, stability] of fps) {
+        const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
+        drawFixedPointMarker(ctx, sx, sy, stability, 7);
+      }
+    }
+  }
+
+  // Trajectory
+  if (model.get("show_trajectory")) {
+    const traj = model.get("trajectory");
+    if (traj && traj.length > 1) {
+      ctx.strokeStyle = "#4CAF50"; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      const proj0 = [traj[0][display[0] + 1]];
+      if (!is1D) proj0.push(traj[0][display[1] + 1]);
+      const [sx0, sy0] = is1D
+        ? worldToScreen(proj0[0], 0, xlim, [-2, 2], w, h)
+        : worldToScreen(proj0[0], proj0[1], xlim, ylim, w, h);
+      ctx.moveTo(sx0, sy0);
+      for (let i = 1; i < traj.length; i++) {
+        const proj = [traj[i][display[0] + 1]];
+        if (!is1D) proj.push(traj[i][display[1] + 1]);
+        const [sx, sy] = is1D
+          ? worldToScreen(proj[0], 0, xlim, [-2, 2], w, h)
+          : worldToScreen(proj[0], proj[1], xlim, ylim, w, h);
+        ctx.lineTo(sx, sy);
+      }
+      ctx.stroke();
+      // Initial condition marker
+      ctx.beginPath(); ctx.arc(sx0, sy0, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#FF9800"; ctx.fill();
+      ctx.strokeStyle = theme.text; ctx.lineWidth = 1; ctx.stroke();
+      const cursor = traj[Math.round(Math.max(0, Math.min(1, model.get('trajectory_fraction') ?? 1)) * (traj.length - 1))];
+      if (cursor && !is1D) {
+        const [sx, sy] = worldToScreen(cursor[display[0]+1], cursor[display[1]+1], xlim, ylim, w, h);
+        ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 2*Math.PI); ctx.fillStyle = theme.cursor; ctx.fill();
+      }
+    }
+  }
+}
+
+function drawTimeSeries(model, timeCtx, w, h, theme = DEFAULT_PLOT_THEME) {
+  const traj = model.get("trajectory");
+  const stateNames = model.get("state_names");
+  timeCtx.clearRect(0, 0, w, h);
+  timeCtx.fillStyle = theme.background; timeCtx.fillRect(0, 0, w, h);
+  if (!traj || traj.length < 2) return;
+  const fraction = Math.max(0, Math.min(1, model.get('trajectory_fraction') ?? 1));
+  const cursorRow = traj[Math.round(fraction * (traj.length - 1))];
+
+  const reference = model.get('show_reference') === false ? [] : (model.get('reference_trajectory') || []);
+  const tMin = traj[0][0], tMax = Math.max(traj.at(-1)[0], reference.at(-1)?.[0] || 0);
+  const pad = 42, plotW = w - 2 * pad, plotH = h - 2 * pad;
+
+  let yMin = Infinity, yMax = -Infinity;
+  for (let d = 0; d < stateNames.length; d++) {
+    const vals = [...traj, ...reference].map((r) => r[d + 1]);
+    yMin = Math.min(yMin, ...vals); yMax = Math.max(yMax, ...vals);
+  }
+  if (yMin === yMax) { yMin -= 0.5; yMax += 0.5; }
+  const yMargin = (yMax - yMin) * 0.1;
+  yMin -= yMargin; yMax += yMargin;
+
+  // Grid
+  timeCtx.strokeStyle = theme.grid; timeCtx.lineWidth = 0.5;
+  const nt = 5, ny = 4;
+  for (let i = 0; i <= nt; i++) {
+    const t = tMin + (i / nt) * (tMax - tMin);
+    const sx = pad + ((t - tMin) / (tMax - tMin)) * plotW;
+    timeCtx.beginPath(); timeCtx.moveTo(sx, pad); timeCtx.lineTo(sx, h - pad); timeCtx.stroke();
+  }
+  for (let i = 0; i <= ny; i++) {
+    const y = yMin + (i / ny) * (yMax - yMin);
+    const sy = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;
+    timeCtx.beginPath(); timeCtx.moveTo(pad, sy); timeCtx.lineTo(w - pad, sy); timeCtx.stroke();
+  }
+
+  // Axes
+  timeCtx.strokeStyle = theme.text; timeCtx.lineWidth = 1;
+  timeCtx.beginPath(); timeCtx.moveTo(pad, pad); timeCtx.lineTo(pad, h - pad); timeCtx.lineTo(w - pad, h - pad); timeCtx.stroke();
+
+  // Ticks
+  timeCtx.fillStyle = theme.muted; timeCtx.font = "10px sans-serif";
+  timeCtx.textAlign = "center"; timeCtx.textBaseline = "top";
+  for (let i = 0; i <= nt; i++) {
+    const t = tMin + (i / nt) * (tMax - tMin);
+    timeCtx.fillText(Number(t.toPrecision(3)).toString(), pad + ((t - tMin) / (tMax - tMin)) * plotW, h - pad + 2);
+  }
+  timeCtx.textAlign = "right"; timeCtx.textBaseline = "middle";
+  for (let i = 0; i <= ny; i++) {
+    const y = yMin + (i / ny) * (yMax - yMin);
+    timeCtx.fillText(y.toFixed(1), pad - 4, h - pad - ((y - yMin) / (yMax - yMin)) * plotH);
+  }
+
+  timeCtx.textAlign = "center"; timeCtx.textBaseline = "bottom"; timeCtx.font = "bold 11px sans-serif";
+  timeCtx.fillText("Time", w / 2, h - 4);
+  timeCtx.save(); timeCtx.translate(12, h / 2); timeCtx.rotate(-Math.PI / 2);
+  timeCtx.textAlign = "center"; timeCtx.textBaseline = "top"; timeCtx.fillText("State", 0, 0); timeCtx.restore();
+
+  // The same frozen full-system path is visible in the time series.
+  timeCtx.save(); timeCtx.setLineDash([5, 4]); timeCtx.strokeStyle = '#8b929d'; timeCtx.lineWidth = 1.5;
+  for (let d = 0; d < stateNames.length; d++) {
+    timeCtx.beginPath();
+    reference.forEach((row, i) => {
+      const sx = pad + (row[0] - tMin) / (tMax - tMin) * plotW;
+      const sy = h - pad - (row[d + 1] - yMin) / (yMax - yMin) * plotH;
+      if (i) timeCtx.lineTo(sx, sy); else timeCtx.moveTo(sx, sy);
+    });
+    timeCtx.stroke();
+  }
+  timeCtx.restore();
+
+  // Curves
+  for (let d = 0; d < stateNames.length; d++) {
+    const color = STATE_COLORS[d % STATE_COLORS.length];
+    timeCtx.strokeStyle = color; timeCtx.lineWidth = 1.5;
+    timeCtx.beginPath();
+    for (let i = 0; i < traj.length; i++) {
+      const t = traj[i][0], y = traj[i][d + 1];
+      const sx = pad + ((t - tMin) / (tMax - tMin)) * plotW;
+      const sy = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;
+      if (i === 0) timeCtx.moveTo(sx, sy); else timeCtx.lineTo(sx, sy);
+    }
+    timeCtx.stroke();
+  }
+
+  const cursorX = pad + ((cursorRow[0] - tMin) / (tMax - tMin)) * plotW;
+  timeCtx.save(); timeCtx.setLineDash([3, 3]); timeCtx.strokeStyle = theme.cursor;
+  timeCtx.beginPath(); timeCtx.moveTo(cursorX, pad); timeCtx.lineTo(cursorX, h-pad); timeCtx.stroke(); timeCtx.restore();
+  // Legend
+  let lx = w - pad - 80, ly = pad + 10;
+  for (let d = 0; d < stateNames.length; d++) {
+    const color = STATE_COLORS[d % STATE_COLORS.length];
+    timeCtx.fillStyle = color; timeCtx.fillRect(lx, ly + d * 16, 12, 3);
+    timeCtx.fillStyle = theme.text; timeCtx.font = "11px sans-serif"; timeCtx.textAlign = "left"; timeCtx.textBaseline = "middle";
+    timeCtx.fillText(stateNames[d], lx + 16, ly + d * 16 + 1.5);
+  }
+}
+
+function drawSweep(model, sweepCtx, w, h, _results = model.get('sweep_results'), _fps = model.get('sweep_fixed_points'), _paramName = model.get('sweep_param'), theme = DEFAULT_PLOT_THEME) {
+  sweepCtx.clearRect(0, 0, w, h);
+  sweepCtx.fillStyle = theme.background; sweepCtx.fillRect(0, 0, w, h);
+  if (!_results || _results.length === 0) return;
+
+  const paramValues = _results.map((r) => r.param_value);
+  const pMin = Math.min(...paramValues), pMax = Math.max(...paramValues);
+  let yMin = Infinity, yMax = -Infinity;
+  if (_fps && _fps.length > 0) {
+    for (const [, x, y] of _fps) { yMin = Math.min(yMin, x, y); yMax = Math.max(yMax, x, y); }
+  } else { yMin = -1; yMax = 1; }
+  if (yMin === yMax) { yMin -= .5; yMax += .5; }
+  const yMargin = (yMax - yMin) * 0.1; yMin -= yMargin; yMax += yMargin;
+  const pad = 35, plotW = w - 2 * pad, plotH = h - 2 * pad;
+
+  // Regime shading
+  if (_results.length > 1) {
+    const dp = (pMax - pMin) / (_results.length - 1);
+    for (let i = 0; i < _results.length; i++) {
+      const r = _results[i];
+      const color = REGIME_COLORS[r.regime] || "#f5f5f5";
+      const sx1 = pad + ((r.param_value - pMin) / (pMax - pMin)) * plotW;
+      const sx2 = pad + ((r.param_value + dp - pMin) / (pMax - pMin)) * plotW;
+      sweepCtx.fillStyle = color; sweepCtx.fillRect(sx1, pad, sx2 - sx1, plotH);
+    }
+  }
+
+  // Grid
+  sweepCtx.strokeStyle = theme.grid; sweepCtx.lineWidth = 0.5;
+  const np = 5, ny = 4;
+  for (let i = 0; i <= np; i++) {
+    const p = pMin + (i / np) * (pMax - pMin);
+    const sx = pad + ((p - pMin) / (pMax - pMin)) * plotW;
+    sweepCtx.beginPath(); sweepCtx.moveTo(sx, pad); sweepCtx.lineTo(sx, h - pad); sweepCtx.stroke();
+  }
+  for (let i = 0; i <= ny; i++) {
+    const y = yMin + (i / ny) * (yMax - yMin);
+    const sy = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;
+    sweepCtx.beginPath(); sweepCtx.moveTo(pad, sy); sweepCtx.lineTo(w - pad, sy); sweepCtx.stroke();
+  }
+
+  // Axes
+  sweepCtx.strokeStyle = theme.text; sweepCtx.lineWidth = 1;
+  sweepCtx.beginPath(); sweepCtx.moveTo(pad, pad); sweepCtx.lineTo(pad, h - pad); sweepCtx.lineTo(w - pad, h - pad); sweepCtx.stroke();
+
+  // Ticks
+  sweepCtx.fillStyle = theme.muted; sweepCtx.font = "10px sans-serif"; sweepCtx.textAlign = "center"; sweepCtx.textBaseline = "top";
+  for (let i = 0; i <= np; i++) {
+    const p = pMin + (i / np) * (pMax - pMin);
+    sweepCtx.fillText(p.toFixed(1), pad + ((p - pMin) / (pMax - pMin)) * plotW, h - pad + 2);
+  }
+  sweepCtx.textAlign = "right"; sweepCtx.textBaseline = "middle";
+  for (let i = 0; i <= ny; i++) {
+    const y = yMin + (i / ny) * (yMax - yMin);
+    sweepCtx.fillText(y.toFixed(1), pad - 4, h - pad - ((y - yMin) / (yMax - yMin)) * plotH);
+  }
+
+  sweepCtx.textAlign = "center"; sweepCtx.textBaseline = "bottom"; sweepCtx.font = "bold 11px sans-serif";
+  sweepCtx.fillText(_paramName || "Parameter", w / 2, h - 4);
+  sweepCtx.save(); sweepCtx.translate(12, h / 2); sweepCtx.rotate(-Math.PI / 2);
+  sweepCtx.textAlign = "center"; sweepCtx.textBaseline = "top"; sweepCtx.fillText("Slice equilibrium state", 0, 0); sweepCtx.restore();
+
+  // Fixed points
+  if (_fps && _fps.length > 0) {
+    for (const [pval, x, y, stability] of _fps) {
+      const sx = pad + ((pval - pMin) / (pMax - pMin)) * plotW;
+      const sy1 = h - pad - ((x - yMin) / (yMax - yMin)) * plotH;
+      const sy2 = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;
+      drawFixedPointMarker(sweepCtx, sx, sy1, stability, 3);
+      drawFixedPointMarker(sweepCtx, sx, sy2, stability, 3);
+    }
+  }
+}
+function mountParameters({ model, controller, document: doc, configuration }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-params');
+  let signature, controls = new Map(), fields = panelScope();
+  scope.cleanup(() => fields.dispose());
+  function update() {
+    const info = model.get('param_info') || {}, params = model.get('params') || {};
+    const visible = configuration.get('visible_parameters');
+    const next = JSON.stringify([info, visible, model.get('model_spec')?.parameters]);
+    if (signature !== next) {
+      signature = next; fields.dispose(); fields = panelScope(); controls = new Map(); element.replaceChildren();
+      const entries = visible ? [...new Set(visible)].filter(name => name in info).map(name => [name, info[name]]) : Object.entries(info);
+      for (const [name, [min, max, fallback, description]] of entries) {
+        const control = numberControl(doc, fields, { label: name, min, max, value: params[name] ?? fallback,
+          step: model.get('model_spec')?.parameters?.[name]?.step || 'any', delay: 30,
+          onChange: value => controller.commit({ params: { ...model.get('params'), [name]: value } }),
+        });
+        control.slider.dataset.param = name; control.element.title = description || name;
+        controls.set(name, control); element.append(control.element);
+      }
+      if (!controls.size) { const hint = doc.createElement('p'); hint.className = 'ppw-hint'; hint.textContent = 'No parameters selected'; element.append(hint); }
+    }
+    for (const [name, control] of controls) control.update(params[name] ?? info[name][2]);
+  }
+  return mountedPanel(element, scope, update);
+}
+
+function mountModel({ model, controller, document: doc }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-control-row', '<label class="ppw-label">Model <select class="ppw-model-select" aria-label="Model"></select></label>');
+  const select = element.querySelector('select');
+  const names = { wilson_cowan: 'Wilson–Cowan', fitzhugh_nagumo: 'FitzHugh–Nagumo', mpr: 'MPR (QIF)', hindmarsh_rose: 'Hindmarsh–Rose', custom: 'Custom' };
+  for (const [value, label] of Object.entries(names)) { const option = doc.createElement('option'); option.value = value; option.textContent = label; select.append(option); }
+  scope.on(select, 'change', () => controller.selectModel(select.value));
+  return mountedPanel(element, scope, () => { select.value = model.get('model_name'); });
+}
+
+function mountProjection({ model, controller, document: doc }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-projection', '<div class="ppw-control-row ppw-state-selector"><label>X axis <select class="ppw-state-x" aria-label="X axis"></select></label><label>Y axis <select class="ppw-state-y" aria-label="Y axis"></select></label></div><div class="ppw-clamped-sliders"></div>');
+  const row = element.querySelector('.ppw-state-selector'), x = element.querySelector('.ppw-state-x'), y = element.querySelector('.ppw-state-y'), clamped = element.querySelector('.ppw-clamped-sliders');
+  let signature, controls = new Map(), fields = panelScope();
+  scope.cleanup(() => fields.dispose());
+  for (const [changed, other] of [[x, y], [y, x]]) scope.on(changed, 'change', () => {
+    if (x.value === y.value) other.value = (Number(changed.value) + 1) % model.get('state_names').length;
+    controller.commit({ display: [Number(x.value), Number(y.value)] });
+  });
+  function update() {
+    const names = model.get('state_names') || [], display = model.get('display') || [0, 1];
+    const def = controller.definition;
+    if (!def) return;
+    const next = JSON.stringify([names, display, def.defaultLims]);
+    if (next !== signature) {
+      signature = next; fields.dispose(); fields = panelScope(); controls = new Map();
+      row.hidden = names.length <= 2;
+      for (const select of [x, y]) {
+        select.replaceChildren();
+        names.forEach((name, i) => { const option = doc.createElement('option'); option.value = i; option.textContent = name; select.append(option); });
+      }
+      x.value = display[0]; y.value = display[1]; clamped.replaceChildren();
+      names.forEach((name, i) => {
+        if (display.includes(i)) return;
+        const [min, max] = def.defaultLims?.[i] || [-5, 5];
+        const control = numberControl(doc, fields, { label: `Fixed ${name}`, min, max,
+          value: model.get('clamped')?.[i] ?? (min + max) / 2, sliderClass: 'ppw-clamped-slider', valueClass: 'ppw-clamped-value',
+          onChange: value => { const values = [...model.get('clamped')]; values[i] = value; controller.commit({ clamped: values }); },
+        });
+        control.slider.dataset.var = i; controls.set(i, control); clamped.append(control.element);
+      });
+    }
+    for (const [i, control] of controls) control.update(model.get('clamped')?.[i] ?? 0);
+  }
+  return mountedPanel(element, scope, update);
+}
+
+function mountLimits({ model, controller, document: doc }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-control-row ppw-limits', `
+    <label>X minimum <input class="ppw-xmin" aria-label="X minimum" type="number" step="any"></label>
+    <label>X maximum <input class="ppw-xmax" aria-label="X maximum" type="number" step="any"></label>
+    <label>Y minimum <input class="ppw-ymin" aria-label="Y minimum" type="number" step="any"></label>
+    <label>Y maximum <input class="ppw-ymax" aria-label="Y maximum" type="number" step="any"></label>
+    <label>Duration <input class="ppw-tmax" aria-label="Duration" type="number" step="any" min="0.01"></label>
+    <span class="ppw-input-error" role="status" hidden></span>`);
+  const inputs = [...element.querySelectorAll('input')], message = element.querySelector('[role=status]');
+  function update() {
+    const values = [...model.get('xlim'), ...model.get('ylim'), model.get('t_max')];
+    inputs.forEach((input, i) => { if (doc.activeElement !== input) input.value = values[i]; });
+  }
+  for (const input of inputs) scope.on(input, 'change', () => {
+    const [xmin, xmax, ymin, ymax, duration] = inputs.map(input => input.value === '' ? NaN : Number(input.value));
+    if (![xmin, xmax, ymin, ymax, duration].every(Number.isFinite) || xmin >= xmax || ymin >= ymax || duration <= 0) {
+      message.hidden = false; message.textContent = 'Use increasing axis bounds and a positive duration'; return;
+    }
+    message.hidden = true;
+    controller.commit({ xlim: [xmin, xmax], ylim: [ymin, ymax], t_max: duration });
+  });
+  return mountedPanel(element, scope, update);
+}
+
+function mountNoise({ model, controller, document: doc }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-noise-section', `
+    <div class="ppw-control-row"><label><input class="ppw-noise-enable" type="checkbox"> Enable noise</label>
+    <label>Integrator <select class="ppw-integrator-select"><option value="rk4">RK4</option><option value="heun">Heun</option></select></label></div>
+    <div class="ppw-noise-sliders"></div>
+    <label>Noise seed <input class="ppw-noise-seed" aria-label="Noise seed" type="number" step="1"></label>
+    <button class="ppw-resample">New realization</button>`);
+  const enable = element.querySelector('.ppw-noise-enable'), integrator = element.querySelector('select'), seed = element.querySelector('.ppw-noise-seed'), sliders = element.querySelector('.ppw-noise-sliders');
+  let signature, controls = [], fields = panelScope(); scope.cleanup(() => fields.dispose());
+  scope.on(enable, 'change', () => controller.commit({ noise_enable: enable.checked, integrator: enable.checked ? 'heun' : model.get('integrator') }));
+  scope.on(integrator, 'change', () => controller.commit({ integrator: integrator.value, noise_enable: integrator.value === 'rk4' ? false : model.get('noise_enable') }));
+  scope.on(seed, 'change', () => {
+    const value = Number(seed.value);
+    if (seed.value && Number.isSafeInteger(value) && value >= -2147483648 && value <= 2147483647) controller.commit({ noise_seed: value });
+    else seed.value = model.get('noise_seed') || 0;
+  });
+  scope.on(element.querySelector('.ppw-resample'), 'click', () => controller.commit({ noise_seed: ((model.get('noise_seed') || 0) + 1) | 0 }));
+  function update() {
+    enable.checked = !!model.get('noise_enable'); integrator.value = model.get('integrator') || 'rk4';
+    if (doc.activeElement !== seed) seed.value = model.get('noise_seed') || 0;
+    sliders.hidden = !enable.checked;
+    const names = model.get('state_names') || [], next = JSON.stringify(names);
+    if (next !== signature) {
+      signature = next; fields.dispose(); fields = panelScope(); sliders.replaceChildren();
+      controls = names.map((name, i) => {
+        const control = numberControl(doc, fields, { label: name + ' noise', min: 0, max: 1, step: .01,
+          value: model.get('noise_sigma')?.[i] || 0, sliderClass: 'ppw-noise-slider', valueClass: 'ppw-noise-value-' + i,
+          onChange: value => { const sigma = names.map((_, k) => model.get('noise_sigma')?.[k] || 0); sigma[i] = value; controller.commit({ noise_sigma: sigma }); },
+        });
+        control.slider.dataset.idx = i; sliders.append(control.element); return control;
+      });
+    }
+    controls.forEach((control, i) => control.update(model.get('noise_sigma')?.[i] || 0));
+  }
+  return mountedPanel(element, scope, update);
+}
+
+function mountLayers({ model, controller, document: doc }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-control-row ppw-toggles');
+  const controls = [['show_nullclines', 'Nullclines', 'ppw-show-null'], ['show_vector_field', 'Vector field', 'ppw-show-vf'], ['show_trajectory', 'Trajectory', 'ppw-show-traj'], ['show_fixed_points', 'Fixed points', 'ppw-show-fp']].map(([trait, text, className]) => {
+    const label = doc.createElement('label'), input = doc.createElement('input'); input.type = 'checkbox'; input.className = className;
+    label.append(input, doc.createTextNode(text)); element.append(label);
+    scope.on(input, 'change', () => controller.commit({ [trait]: input.checked }));
+    return [trait, input];
+  });
+  return mountedPanel(element, scope, () => { for (const [trait, input] of controls) input.checked = !!model.get(trait); });
+}
+
+function mountComparison({ model, controller, document: doc }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-comparison', '<button class="ppw-reference">Freeze scene</button><button class="ppw-clear-reference">Clear reference</button><label><input class="ppw-show-reference" type="checkbox"> Show frozen scene</label><button class="ppw-reset">Reset experiment</button><span class="ppw-reference-status" role="status"></span>');
+  scope.on(element.querySelector('.ppw-reference'), 'click', () => controller.captureReference());
+  scope.on(element.querySelector('.ppw-clear-reference'), 'click', () => controller.commit({ reference_trajectory: [], reference_scene: {}, reference_metadata: {} }));
+  scope.on(element.querySelector('.ppw-reset'), 'click', () => controller.reset());
+  scope.on(element.querySelector('.ppw-show-reference'), 'change', event => controller.commit({ show_reference: event.target.checked }));
+  return mountedPanel(element, scope, () => {
+    const hasReference = !!model.get('reference_trajectory')?.length;
+    element.querySelector('.ppw-clear-reference').disabled = !hasReference;
+    element.querySelector('.ppw-reference').disabled = !model.get('trajectory')?.length;
+    element.querySelector('.ppw-reference').textContent = hasReference ? 'Replace frozen scene' : 'Freeze scene';
+    element.querySelector('.ppw-show-reference').checked = model.get('show_reference') !== false;
+    element.querySelector('.ppw-show-reference').disabled = !hasReference;
+    const params = Object.entries(model.get('reference_metadata')?.params || {}).map(([key, value]) => `${key}=${Number(value).toPrecision(3)}`).join(' · ');
+    element.querySelector('.ppw-reference-status').textContent = hasReference ? `Frozen scene retained: ${params}` : 'Freeze nullclines, equilibria and trajectory, then move a slider.';
+  });
+}
+
+function mountExport({ model, controller, document: doc }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-export-row', '<button class="ppw-export-svg">Export SVG</button><button class="ppw-export-tikz">Export TikZ</button>');
+  scope.on(element.querySelector('.ppw-export-svg'), 'click', () => {
+    if (controller.error) return;
+    const canvas = new C2S(500, 500); drawPhasePlane(model, canvas, 500, 500, plotTheme(element));
+    downloadBlob(doc, new Blob([canvas.getSerializedSvg(true)], { type: 'image/svg+xml' }), 'phase_plane.svg');
+  });
+  const tikz = element.querySelector('.ppw-export-tikz');
+  const standalone = model._isMock || typeof model.send !== 'function';
+  tikz.disabled = standalone; if (standalone) tikz.title = 'TikZ export requires a Jupyter kernel';
+  scope.on(tikz, 'click', () => model.send({ type: 'export_tikz' }));
+  const receive = message => { if (message?.type === 'tikz_data') downloadBlob(doc, new Blob([message.content], { type: 'application/x-tex' }), message.filename || 'phase_plane.tex'); };
+  if (!standalone) { model.on('msg:custom', receive); scope.cleanup(() => model.off('msg:custom', receive)); }
+  return mountedPanel(element, scope, () => { element.querySelector('.ppw-export-svg').disabled = !!controller.error; });
+}
+function mountPhasePlane({ model, controller, document: doc }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-phase-container', `
+    <div class="ppw-canvas-title">Phase plane</div>
+    <canvas class="ppw-phase-canvas" tabindex="0" role="img" aria-label="Phase plane. Click or use arrow keys to set the initial condition. Shift increases the step."></canvas>
+    <div class="ppw-canvas-hint">Click or use arrow keys to set initial conditions · Shift for larger steps</div>
+    <output class="ppw-initial-state"></output>
+    <div class="ppw-legend"><span class="ppw-nullcline-x" style="color:#2196f3"></span><span class="ppw-nullcline-y" style="color:#f44336"></span><span style="color:#4caf50">● Stable</span><span style="color:#9c27b0">◆ Saddle</span><span style="color:#f44336">○ Unstable</span><span style="color:#4caf50">— Trajectory</span><span>┄ Reference</span></div>`);
+  const canvas = element.querySelector('canvas');
+  const surface = canvasSurface(canvas, scope, (ctx, w, h, theme) => drawPhasePlane(model, ctx, w, h, theme));
+  scope.on(canvas, 'click', event => {
+    const rect = canvas.getBoundingClientRect(), w = surface.width, h = surface.height;
+    const sx = (event.clientX - rect.left) * w / rect.width, sy = (event.clientY - rect.top) * h / rect.height;
+    if (sx < 42 || sy < 42 || sx > w - 42 || sy > h - 42) return;
+    const [x0, y0] = screenToWorld(sx, sy, model.get('xlim'), model.get('ylim'), w, h);
+    controller.commit({ x0, y0 }); canvas.focus();
+  });
+  scope.on(canvas, 'keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    const [xmin, xmax] = model.get('xlim'), [ymin, ymax] = model.get('ylim');
+    const fraction = event.shiftKey ? .1 : .01;
+    const x0 = model.get('x0') + (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0) * (xmax - xmin) * fraction;
+    const y0 = model.get('y0') + (event.key === 'ArrowUp' ? 1 : event.key === 'ArrowDown' ? -1 : 0) * (ymax - ymin) * fraction;
+    controller.commit({ x0: Math.max(xmin, Math.min(xmax, x0)), y0: Math.max(ymin, Math.min(ymax, y0)) });
+  });
+  return mountedPanel(element, scope, () => {
+    surface.render();
+    const display = model.get('display') || [0, 1], names = model.get('state_names') || [];
+    element.querySelector('.ppw-nullcline-x').textContent = `d${names[display[0]]}/dt = 0`;
+    element.querySelector('.ppw-nullcline-y').textContent = display.length > 1 ? `d${names[display[1]]}/dt = 0` : '';
+    element.querySelector('.ppw-initial-state').textContent = display.map((index, i) => `${names[index]}₀ = ${Number(model.get(i ? 'y0' : 'x0')).toFixed(3)}`).join(' · ');
+  });
+}
+
+function mountTimeSeries({ model, controller, document: doc }) {
+  const scope = panelScope(), owner = {}, element = panelElement(doc, 'ppw-time-container', `
+    <div class="ppw-canvas-title">Time series</div><canvas class="ppw-time-canvas" role="img" aria-label="Time series"></canvas>
+    <div class="ppw-playback"><button class="ppw-play">Play trajectory</button><input class="ppw-time-cursor" aria-label="Trajectory time" type="range" min="0" max="1" step="0.001"><output class="ppw-cursor-time"></output></div>`);
+  const surface = canvasSurface(element.querySelector('canvas'), scope, (ctx, w, h, theme) => drawTimeSeries(model, ctx, w, h, theme), { ratio: .56, minHeight: 230 });
+  const cursor = element.querySelector('.ppw-time-cursor'), button = element.querySelector('.ppw-play');
+  scope.on(cursor, 'input', () => controller.commit({ trajectory_fraction: Number(cursor.value) }));
+  scope.on(button, 'click', () => controller.play(owner));
+  scope.cleanup(() => controller.pause(owner));
+  return mountedPanel(element, scope, () => {
+    surface.render();
+    const trajectory = model.get('trajectory') || [], fraction = Math.max(0, Math.min(1, model.get('trajectory_fraction') ?? 1));
+    cursor.value = fraction; cursor.disabled = trajectory.length < 2; button.disabled = trajectory.length < 2;
+    const row = trajectory[Math.round(fraction * (trajectory.length - 1))];
+    element.querySelector('.ppw-cursor-time').textContent = row ? 't = ' + row[0].toFixed(2) : 'No trajectory';
+    button.textContent = controller.playing ? 'Pause' : 'Play trajectory'; button.setAttribute('aria-pressed', String(controller.playing));
+  });
+}
+
+function mountSweep({ model, controller, document: doc }) {
+  const scope = panelScope(), owner = {}, element = panelElement(doc, 'ppw-sweep', `
+    <div class="ppw-sweep-header">Parameter sweep</div>
+    <div class="ppw-sweep-controls"><label>Parameter <select class="ppw-sweep-select" aria-label="Sweep parameter"></select></label>
+    <label>Minimum <input class="ppw-sweep-min" type="number" step="any"></label><label>Maximum <input class="ppw-sweep-max" type="number" step="any"></label>
+    <label>Samples <input class="ppw-sweep-n" type="number" value="50" min="2" max="200" step="1"></label>
+    <button class="ppw-sweep-btn">Run sweep</button><button class="ppw-sweep-cancel">Cancel</button></div>
+    <div class="ppw-sweep-progress"><div class="ppw-sweep-progress-bar"></div><span class="ppw-sweep-progress-text"></span></div>
+    <div class="ppw-sweep-status" role="status"></div><p class="ppw-sweep-empty ppw-hint">Run a sweep to compare regimes and slice equilibria across parameter values.</p><canvas class="ppw-sweep-canvas" role="img" aria-label="Parameter sweep"></canvas>
+    <div class="ppw-legend ppw-regime-legend" hidden><span><i style="background:#e3f2fd"></i>Fixed-point regime</span><span><i style="background:#fff3e0"></i>Oscillatory regime</span><span><i style="background:#f5f5f5"></i>Other</span></div>`);
+  const select = element.querySelector('select'), min = element.querySelector('.ppw-sweep-min'), max = element.querySelector('.ppw-sweep-max'), count = element.querySelector('.ppw-sweep-n'), run = element.querySelector('.ppw-sweep-btn'), cancel = element.querySelector('.ppw-sweep-cancel');
+  let signature;
+  const surface = canvasSurface(element.querySelector('canvas'), scope, (ctx, w, h, theme) => drawSweep(model, ctx, w, h, undefined, undefined, undefined, theme), { width: 700, ratio: 3 / 7, minHeight: 240 });
+  function bounds() { const info = model.get('param_info')?.[select.value]; if (info) { min.value = info[0]; max.value = info[1]; } }
+  scope.on(select, 'change', bounds);
+  scope.on(run, 'click', () => controller.startSweep({ parameter: select.value,
+    min: min.value === '' ? NaN : Number(min.value), max: max.value === '' ? NaN : Number(max.value), count: Number(count.value),
+  }, owner));
+  scope.on(cancel, 'click', () => controller.cancelSweep());
+  scope.cleanup(() => controller.cancelSweep(owner));
+  return mountedPanel(element, scope, () => {
+    const info = model.get('param_info') || {}, next = JSON.stringify(info);
+    if (signature !== next) {
+      signature = next; const previous = select.value; select.replaceChildren();
+      for (const name of Object.keys(info)) { const option = doc.createElement('option'); option.value = name; option.textContent = name; select.append(option); }
+      if (previous in info) select.value = previous; else bounds();
+    }
+    const running = !!model.get('sweep_running'); run.disabled = running || !select.value; cancel.disabled = !running;
+    element.querySelector('.ppw-sweep-status').textContent = controller.sweep.status;
+    element.querySelector('.ppw-sweep-progress').classList.toggle('visible', running);
+    element.querySelector('.ppw-sweep-progress-bar').style.width = controller.sweep.progress + '%';
+    element.querySelector('.ppw-sweep-progress-text').textContent = controller.sweep.progress + '%';
+    const hasResults = !!model.get('sweep_results')?.length;
+    element.querySelector('.ppw-sweep-empty').hidden = hasResults;
+    element.querySelector('.ppw-regime-legend').hidden = !hasResults;
+    element.querySelector('canvas').hidden = !hasResults;
+    if (hasResults) surface.render();
+  });
+}
+function escapeHtml(value) { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
+
+function mountEditor({ model, controller, document: doc }) {
+  const scope = panelScope();
+  const element = panelElement(doc, 'ppw-editor-component', `<button class="ppw-editor-toggle" aria-expanded="false">Custom model editor</button>\n      <div class="ppw-editor-panel">
         <div class="ppw-editor-section">
           <div class="ppw-editor-section-title">State Variables</div>
           <table class="ppw-editor-table ppw-editor-state-table">
@@ -14781,844 +15716,17 @@ export function render({ model, el }) {
         <div class="ppw-editor-error"></div>
         <div class="ppw-editor-status"></div>
       </div>
-      <div class="ppw-plots">
-        <div class="ppw-phase-container">
-          <div class="ppw-canvas-title">
-            <span>Phase Plane</span>
-            <span class="ppw-canvas-hint">Click to set initial condition</span>
-          </div>
-          <canvas class="ppw-phase-canvas" width="500" height="500"></canvas>
-          <div class="ppw-legend">
-            <div class="ppw-legend-item"><div class="ppw-legend-line" style="background:#2196F3"></div> dX/dt = 0</div>
-            <div class="ppw-legend-item"><div class="ppw-legend-line" style="background:#f44336"></div> dY/dt = 0</div>
-            <div class="ppw-legend-item"><div class="ppw-legend-line" style="background:#4CAF50"></div> Trajectory</div>
-            <div class="ppw-legend-item"><div class="ppw-legend-dot" style="background:#4CAF50"></div> Stable</div>
-            <div class="ppw-legend-item"><div class="ppw-legend-dot" style="background:#f44336"></div> Unstable</div>
-            <div class="ppw-legend-item"><div class="ppw-legend-dot" style="background:#9C27B0"></div> Saddle</div>
-          </div>
-        </div>
-        <div class="ppw-time-container">
-          <div class="ppw-canvas-title">Time Series</div>
-          <canvas class="ppw-time-canvas" width="500" height="280"></canvas>
-        </div>
-      </div>
-      <div class="ppw-sweep">
-        <div class="ppw-sweep-header">Bifurcation / Parameter Sweep</div>
-        <div class="ppw-sweep-controls">
-          <label>Sweep parameter:
-            <select class="ppw-sweep-select"></select>
-          </label>
-          <label>Min: <input class="ppw-sweep-min" type="number"></label>
-          <label>Max: <input class="ppw-sweep-max" type="number"></label>
-          <label>N: <input class="ppw-sweep-n" type="number" value="50" min="5" max="200"></label>
-          <button class="ppw-sweep-btn">Run Sweep</button>
-          <span class="ppw-sweep-status"></span>
-        </div>
-        <div class="ppw-sweep-progress">
-          <div class="ppw-sweep-progress-bar" style="width: 0%"></div>
-          <span class="ppw-sweep-progress-text"></span>
-        </div>
-        <canvas class="ppw-sweep-canvas" width="700" height="300"></canvas>
-        <div class="ppw-legend">
-          <div class="ppw-legend-item"><div class="ppw-legend-dot" style="background:#4CAF50"></div> Stable</div>
-          <div class="ppw-legend-item"><div class="ppw-legend-dot" style="background:#f44336"></div> Unstable</div>
-          <div class="ppw-legend-item"><div class="ppw-legend-dot" style="background:#9C27B0"></div> Saddle</div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // ── DOM refs ──
-  const modelSelect = el.querySelector(".ppw-model-select");
-  const paramsDiv = el.querySelector(".ppw-params");
-  const xMinIn = el.querySelector(".ppw-xmin");
-  const xMaxIn = el.querySelector(".ppw-xmax");
-  const yMinIn = el.querySelector(".ppw-ymin");
-  const yMaxIn = el.querySelector(".ppw-ymax");
-  const tMaxIn = el.querySelector(".ppw-tmax");
-  const phaseCanvas = el.querySelector(".ppw-phase-canvas");
-  const timeCanvas = el.querySelector(".ppw-time-canvas");
-  const sweepSelect = el.querySelector(".ppw-sweep-select");
-  const sweepMinIn = el.querySelector(".ppw-sweep-min");
-  const sweepMaxIn = el.querySelector(".ppw-sweep-max");
-  const sweepNIn = el.querySelector(".ppw-sweep-n");
-  const sweepBtn = el.querySelector(".ppw-sweep-btn");
-  const sweepStatus = el.querySelector(".ppw-sweep-status");
-  const sweepProgressBar = el.querySelector(".ppw-sweep-progress-bar");
-  const sweepProgressText = el.querySelector(".ppw-sweep-progress-text");
-  const sweepProgress = el.querySelector(".ppw-sweep-progress");
-  const sweepCanvas = el.querySelector(".ppw-sweep-canvas");
-  const showNull = el.querySelector(".ppw-show-null");
-  const showVf = el.querySelector(".ppw-show-vf");
-  const showTraj = el.querySelector(".ppw-show-traj");
-  const showFp = el.querySelector(".ppw-show-fp");
-  const editorToggle = el.querySelector(".ppw-editor-toggle");
-  const editorPanel = el.querySelector(".ppw-editor-panel");
-  const editorStateTable = editorPanel.querySelector(".ppw-editor-state-table tbody");
-  const editorParamTable = editorPanel.querySelector(".ppw-editor-param-table tbody");
-  const editorEquationsDiv = editorPanel.querySelector(".ppw-editor-equations");
-  const editorApplyBtn = editorPanel.querySelector(".ppw-editor-apply");
-  const editorCopyBtn = editorPanel.querySelector(".ppw-editor-copy");
-  const editorError = editorPanel.querySelector(".ppw-editor-error");
-  const editorStatus = editorPanel.querySelector(".ppw-editor-status");
-  const noiseEnable = el.querySelector(".ppw-noise-enable");
-  const noiseSlidersDiv = el.querySelector(".ppw-noise-sliders");
-  const integratorSelect = el.querySelector(".ppw-integrator-select");
-
-  const phaseCtx = phaseCanvas.getContext("2d");
-  const timeCtx = timeCanvas.getContext("2d");
-  const sweepCtx = sweepCanvas.getContext("2d");
-  const stateXSelect = el.querySelector(".ppw-state-x");
-  const stateYSelect = el.querySelector(".ppw-state-y");
-  const stateSelectorRow = el.querySelector(".ppw-state-selector");
-  const clampedDiv = el.querySelector(".ppw-clamped-sliders");
-
-  const MODEL_NAMES = ["wilson_cowan", "fitzhugh_nagumo", "mpr", "hindmarsh_rose", "custom"];
-  const MODEL_LABELS = { wilson_cowan: "Wilson-Cowan", fitzhugh_nagumo: "FitzHugh-Nagumo", mpr: "MPR (QIF)", hindmarsh_rose: "Hindmarsh–Rose", custom: "Custom" };
-  // Custom model is resolved dynamically via compileModelSpec
-
-  // ═════════════════════════════════════════════════════════════
-  //  CLIENT-SIDE COMPUTATION ENGINE
-  // ═════════════════════════════════════════════════════════════
-
-  function computeAll() {
-    const modelName = model.get("model_name");
-    const params = model.get("params");
-    const xlim = model.get("xlim");
-    const ylim = model.get("ylim");
-    const tMax = model.get("t_max");
-    const x0 = model.get("x0");
-    const y0 = model.get("y0");
-
-    let def;
-    if (modelName === 'custom' && model.get('model_spec')) {
-      const spec = model.get('model_spec');
-      if (spec && spec.equations && Object.keys(spec.equations).length > 0) {
-        try { def = compileModelSpec(spec); } catch (e) { def = MODELS.wilson_cowan; }
-      } else { def = MODELS[modelName] || MODELS.wilson_cowan; }
-    } else { def = MODELS[modelName] || MODELS.wilson_cowan; }
-    const stateVars = def.stateVars || def.stateNames || [];
-    const n = stateVars.length;
-
-    // Display indices and clamped (non-displayed) state variable values
-    const display = model.get("display") || def.display || [0, 1];
-    let clamped = model.get("clamped");
-    if (!clamped || clamped.length !== n) {
-      clamped = stateVars.map((_, i) => {
-        const lims = (def.defaultLims && def.defaultLims[i]) || [-1, 1];
-        return (lims[0] + lims[1]) / 2;
-      });
-      model.set("clamped", clamped);
-    }
-
-    // Projected RHS for phase-plane computations
-    const _spec4proj = modelName === 'custom' ? model.get('model_spec') : null;
-    const fProj = makeProjectedRHS(modelName, display, clamped, _spec4proj);
-
-    // Nullclines (projected 2-D slice)
-    const [ncX, ncY] = computeNullclines(fProj, params, xlim, ylim, 60);
-    model.set("nullcline_x", ncX);
-    model.set("nullcline_y", ncY);
-
-    // Vector field (projected)
-    const vf = computeVectorField(fProj, params, xlim, ylim, 12);
-    model.set("vector_field", vf);
-
-    // Fixed points (projected slice)
-    const fps = findFixedPoints(fProj, params, xlim, ylim, 25);
-    model.set("fixed_points", fps);
-
-    // Trajectory: integrate the full N-dimensional system
-    const fullState0 = [...clamped];
-    fullState0[display[0]] = x0;
-    if (display.length > 1) fullState0[display[1]] = y0;
-    const integrator = model.get('integrator') || 'rk4';
-    const noiseSigma = (integrator === 'heun' && model.get('noise_enable'))
-                       ? model.get('noise_sigma') : null;
-    const settings = { integrator, noiseSigma };
-    const trajDef = (modelName === 'custom' && def && def.f) ? def : modelName;
-    const traj = simulate(trajDef, fullState0, 0, tMax, 0.01, params, settings);
-    const step = Math.max(1, Math.floor(traj.length / 2000));
-    const trajDisplay = traj.filter((_, i) => i % step === 0);
-    model.set("trajectory", trajDisplay);
-
-    // Render
-    renderPhasePlane();
-    renderTimeSeries();
-
-    // Sync to Python if in Jupyter mode
-    if (!isStandalone) model.save_changes();
-  }
-
-  // ── Model selector ──
-  function populateModelSelector() {
-    const current = model.get("model_name");
-    modelSelect.innerHTML = MODEL_NAMES.map(
-      (m) => `<option value="${m}" ${m === current ? "selected" : ""}>${MODEL_LABELS[m]}</option>`,
-    ).join("");
-  }
-
-  modelSelect.addEventListener("change", () => {
-    const newModel = modelSelect.value;
-    let def;
-    if (newModel === 'custom' && model.get('model_spec')) {
-      const spec = model.get('model_spec');
-      if (spec && spec.equations && Object.keys(spec.equations).length > 0) {
-        try { def = compileModelSpec(spec); } catch (e) { def = MODELS[newModel] || MODELS.wilson_cowan; }
-      } else { def = MODELS[newModel] || MODELS.wilson_cowan; }
-    } else { def = MODELS[newModel]; }
-    model.set("model_name", newModel);
-    model.set("param_info", def.paramInfo);
-    model.set("state_names", def.stateVars || def.stateNames);
-    model.set("params", { ...def.defaultParams });
-
-    // Reset display and clamped for new model
-    const display = def.display || [0, 1];
-    model.set("display", display);
-    const stateVars = def.stateVars || def.stateNames || [];
-    const clamped = stateVars.map((_, i) => {
-      const lims = (def.defaultLims && def.defaultLims[i]) || [-1, 1];
-      return (lims[0] + lims[1]) / 2;
-    });
-    model.set("clamped", clamped);
-
-    // Use defaultLims for displayed variables, fall back to defaultXlim/defaultYlim
-    if (def.defaultLims && def.defaultLims[display[0]]) {
-      model.set("xlim", [...def.defaultLims[display[0]]]);
-    } else {
-      model.set("xlim", [...def.defaultXlim]);
-    }
-    if (display.length > 1 && def.defaultLims && def.defaultLims[display[1]]) {
-      model.set("ylim", [...def.defaultLims[display[1]]]);
-    } else {
-      model.set("ylim", [...def.defaultYlim]);
-    }
-    model.set("x0", model.get("xlim")[0] + 0.1 * (model.get("xlim")[1] - model.get("xlim")[0]));
-    model.set("y0", model.get("ylim")[0] + 0.1 * (model.get("ylim")[1] - model.get("ylim")[0]));
-    if (!isStandalone) model.save_changes();
-    createParamSliders(def.paramInfo, def.defaultParams);
-    updateLimitInputs();
-    populateStateSelectors(def, display);
-    createClampedSliders(def, clamped, display);
-    integratorSelect.value = model.get('integrator') || 'rk4';
-    noiseEnable.checked = model.get('noise_enable') || false;
-    createNoiseSliders();
-    computeAll();
-  });
-
-  // ── Parameter sliders ──
-  function createParamSliders(paramInfo, currentParams) {
-    paramsDiv.innerHTML = "";
-    if (!paramInfo || Object.keys(paramInfo).length === 0) return;
-    for (const [name, [min, max, defaultVal, desc]] of Object.entries(paramInfo)) {
-      const value = currentParams[name] !== undefined ? currentParams[name] : defaultVal;
-      const div = document.createElement("div");
-      div.className = "ppw-param";
-      div.innerHTML = `
-        <label title="${desc}">${name}: <span class="ppw-param-value">${value.toFixed(3)}</span></label>
-        <input type="range" class="ppw-param-slider" data-param="${name}"
-          min="${min}" max="${max}" step="${(max - min) / 500}" value="${value}">
-      `;
-      paramsDiv.appendChild(div);
-    }
-    paramsDiv.querySelectorAll(".ppw-param-slider").forEach((slider) => {
-      let timeout;
-      slider.addEventListener("input", () => {
-        const name = slider.dataset.param;
-        const val = parseFloat(slider.value);
-        slider.parentElement.querySelector(".ppw-param-value").textContent = val.toFixed(3);
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          const params = { ...model.get("params") };
-          params[name] = val;
-          model.set("params", params);
-          if (!isStandalone) model.save_changes();
-          computeAll();
-        }, 30);
-      });
-    });
-    // Update sweep dropdown
-    const keys = Object.keys(paramInfo);
-    sweepSelect.innerHTML = keys.map((k) => `<option value="${k}">${k}</option>`).join("");
-    if (keys.length > 0) {
-      const [min, max] = paramInfo[keys[0]];
-      sweepMinIn.value = min;
-      sweepMaxIn.value = max;
-    }
-  }
-
-  // ── State variable selector ──
-  function populateStateSelectors(def, display) {
-    const stateVars = def.stateVars || def.stateNames || [];
-    const n = stateVars.length;
-    if (n <= 2) {
-      stateSelectorRow.style.display = "none";
-      return;
-    }
-    stateSelectorRow.style.display = "flex";
-    stateXSelect.innerHTML = stateVars.map((name, i) =>
-      `<option value="${i}" ${display[0] === i ? "selected" : ""}>${name}</option>`
-    ).join("");
-    stateYSelect.innerHTML = stateVars.map((name, i) =>
-      `<option value="${i}" ${display[1] === i ? "selected" : ""}>${name}</option>`
-    ).join("");
-  }
-
-  stateXSelect.addEventListener("change", () => {
-    const xIdx = parseInt(stateXSelect.value);
-    const yIdx = parseInt(stateYSelect.value);
-    if (xIdx === yIdx) {
-      stateYSelect.value = (xIdx + 1) % (model.get('state_names') || []).length;
-    }
-    const display = [parseInt(stateXSelect.value), parseInt(stateYSelect.value)];
-    model.set("display", display);
-    if (!isStandalone) model.save_changes();
-    computeAll();
-  });
-
-  stateYSelect.addEventListener("change", () => {
-    const xIdx = parseInt(stateXSelect.value);
-    const yIdx = parseInt(stateYSelect.value);
-    if (xIdx === yIdx) {
-      stateXSelect.value = (yIdx + 1) % (model.get('state_names') || []).length;
-    }
-    const display = [parseInt(stateXSelect.value), parseInt(stateYSelect.value)];
-    model.set("display", display);
-    if (!isStandalone) model.save_changes();
-    computeAll();
-  });
-
-  // ── Clamped state variable sliders ──
-  function createClampedSliders(def, clamped, display) {
-    const stateVars = def.stateVars || def.stateNames || [];
-    const n = stateVars.length;
-    if (n <= 2) {
-      clampedDiv.style.display = "none";
-      clampedDiv.innerHTML = "";
-      return;
-    }
-    clampedDiv.style.display = "block";
-    const indices = [];
-    for (let i = 0; i < n; i++) {
-      if (!display.includes(i)) indices.push(i);
-    }
-    if (indices.length === 0) {
-      clampedDiv.style.display = "none";
-      return;
-    }
-    const lims = def.defaultLims || Array(n).fill([-5, 5]);
-    let html = '<div style="font-size:11px;color:#666;margin-bottom:4px;">Fixed (non-displayed) state variables:</div>';
-    for (const idx of indices) {
-      const name = stateVars[idx];
-      const [lo, hi] = lims[idx] || [-5, 5];
-      const val = clamped[idx] !== undefined ? clamped[idx] : (lo + hi) / 2;
-      html += `
-        <div class="ppw-param">
-          <label>${name}: <span class="ppw-clamped-value">${val.toFixed(3)}</span></label>
-          <input type="range" class="ppw-clamped-slider" data-var="${idx}"
-            min="${lo}" max="${hi}" step="${(hi - lo) / 500}" value="${val}">
-        </div>`;
-    }
-    clampedDiv.innerHTML = html;
-    clampedDiv.querySelectorAll(".ppw-clamped-slider").forEach((slider) => {
-      slider.addEventListener("input", () => {
-        const idx = parseInt(slider.dataset.var);
-        const val = parseFloat(slider.value);
-        slider.parentElement.querySelector(".ppw-clamped-value").textContent = val.toFixed(3);
-        const clamped = [...(model.get("clamped") || [])];
-        clamped[idx] = val;
-        model.set("clamped", clamped);
-        if (!isStandalone) model.save_changes();
-        computeAll();
-      });
-    });
-  }
-
-  // ── Limit / tmax inputs ──
-  function updateLimitInputs() {
-    const xlim = model.get("xlim");
-    const ylim = model.get("ylim");
-    xMinIn.value = xlim[0]; xMaxIn.value = xlim[1];
-    yMinIn.value = ylim[0]; yMaxIn.value = ylim[1];
-    tMaxIn.value = model.get("t_max");
-  }
-
-  function sendLimits() {
-    model.set("xlim", [parseFloat(xMinIn.value), parseFloat(xMaxIn.value)]);
-    model.set("ylim", [parseFloat(yMinIn.value), parseFloat(yMaxIn.value)]);
-    model.set("t_max", parseFloat(tMaxIn.value));
-    if (!isStandalone) model.save_changes();
-    computeAll();
-  }
-  [xMinIn, xMaxIn, yMinIn, yMaxIn, tMaxIn].forEach((inp) => inp.addEventListener("change", sendLimits));
-
-  // ── Noise controls ──
-  function createNoiseSliders() {
-    const dim = (MODELS[model.get("model_name")] || {}).dim || 0;
-    const stateNames = model.get("state_names") || [];
-    if (dim <= 0 || !noiseEnable.checked) {
-      noiseSlidersDiv.style.display = "none";
-      return;
-    }
-    noiseSlidersDiv.style.display = "block";
-    // Get current noise sigma values, defaulting to zeros
-    let sigma = model.get("noise_sigma");
-    if (!sigma || sigma.length !== dim) {
-      sigma = new Array(dim).fill(0);
-      model.set("noise_sigma", sigma);
-    }
-    let html = '<div style="font-size:11px;color:#666;margin-bottom:4px;">Noise strengths:</div>';
-    for (let i = 0; i < dim; i++) {
-      const name = stateNames[i] || ("x" + i);
-      const val = sigma[i] !== undefined ? sigma[i] : 0;
-      html += `
-        <div class="ppw-param">
-          <label>${name}: <span class="ppw-noise-value-${i}">${val.toFixed(3)}</span></label>
-          <input type="range" class="ppw-noise-slider" data-idx="${i}"
-            min="0" max="1" step="0.01" value="${val}">
-        </div>`;
-    }
-    noiseSlidersDiv.innerHTML = html;
-    noiseSlidersDiv.querySelectorAll(".ppw-noise-slider").forEach((slider) => {
-      slider.addEventListener("input", () => {
-        const idx = parseInt(slider.dataset.idx);
-        const val = parseFloat(slider.value);
-        const span = noiseSlidersDiv.querySelector(".ppw-noise-value-" + idx);
-        if (span) span.textContent = val.toFixed(3);
-        const sigma = [...(model.get("noise_sigma") || new Array(dim).fill(0))];
-        sigma[idx] = val;
-        model.set("noise_sigma", sigma);
-        if (!isStandalone) model.save_changes();
-        computeAll();
-      });
-    });
-  }
-
-  noiseEnable.addEventListener("change", () => {
-    model.set("noise_enable", noiseEnable.checked);
-    if (!isStandalone) model.save_changes();
-    createNoiseSliders();
-  });
-
-  integratorSelect.addEventListener("change", () => {
-    model.set("integrator", integratorSelect.value);
-    if (!isStandalone) model.save_changes();
-  });
-
-  // ── Toggles ──
-  [showNull, showVf, showTraj, showFp].forEach((cb) => {
-    cb.addEventListener("change", () => {
-      model.set("show_nullclines", showNull.checked);
-      model.set("show_vector_field", showVf.checked);
-      model.set("show_trajectory", showTraj.checked);
-      model.set("show_fixed_points", showFp.checked);
-      if (!isStandalone) model.save_changes();
-      renderPhasePlane();
-    });
-  });
-
-  // ── Phase plane click ──
-  phaseCanvas.addEventListener("click", (e) => {
-    const rect = phaseCanvas.getBoundingClientRect();
-    const scaleX = phaseCanvas.width / rect.width;
-    const scaleY = phaseCanvas.height / rect.height;
-    const sx = (e.clientX - rect.left) * scaleX;
-    const sy = (e.clientY - rect.top) * scaleY;
-    const xlim = model.get("xlim");
-    const ylim = model.get("ylim");
-    const [wx, wy] = screenToWorld(sx, sy, xlim, ylim, phaseCanvas.width, phaseCanvas.height);
-    model.set("x0", wx);
-    model.set("y0", wy);
-    if (!isStandalone) model.save_changes();
-    computeAll();
-  });
-
-  // ── Sweep (async chunked with live progress) ──
-  let _sweepAbort = null;
-
-  sweepBtn.addEventListener("click", () => {
-    const param = sweepSelect.value;
-    const min = parseFloat(sweepMinIn.value);
-    const max = parseFloat(sweepMaxIn.value);
-    const nSweep = parseInt(sweepNIn.value);
-    if (isNaN(min) || isNaN(max) || isNaN(nSweep) || nSweep < 2) return;
-
-    sweepBtn.disabled = true;
-    sweepStatus.innerHTML = '<span class="ppw-sweep-spinner"></span> Running...';
-    sweepProgress.classList.add("visible");
-    sweepProgressBar.style.width = "0%";
-    sweepProgressText.textContent = "0%";
-
-    const modelName = model.get("model_name");
-    const params = model.get("params");
-    const xlim = model.get("xlim");
-    const ylim = model.get("ylim");
-    let def;
-    if (modelName === 'custom' && model.get('model_spec')) {
-      const spec = model.get('model_spec');
-      if (spec && spec.equations && Object.keys(spec.equations).length > 0) {
-        try { def = compileModelSpec(spec); } catch (e) { def = MODELS.wilson_cowan; }
-      } else { def = MODELS[modelName] || MODELS.wilson_cowan; }
-    } else { def = MODELS[modelName]; }
-    const display = model.get("display") || def.display || [0, 1];
-    const stateVars = def.stateVars || def.stateNames || [];
-    const dim = stateVars.length;
-    let clamped = model.get("clamped");
-    if (!clamped || clamped.length !== dim) {
-      clamped = stateVars.map((_, i) => {
-        const lims = (def.defaultLims && def.defaultLims[i]) || [-1, 1];
-        return (lims[0] + lims[1]) / 2;
-      });
-    }
-    const _sweepSpec = modelName === 'custom' ? model.get('model_spec') : null;
-    const fProj = makeProjectedRHS(modelName, display, clamped, _sweepSpec);
-    const sweepModelArg = (modelName === 'custom' && def && def.f) ? def : modelName;
-
-    const values = linspace(min, max, nSweep);
-    const results = [];
-    const allFps = [];
-    let idx = 0;
-    const CHUNK = 2;
-    let aborted = false;
-    _sweepAbort = () => { aborted = true; };
-
-    function step() {
-      if (aborted) {
-        sweepBtn.disabled = false;
-        sweepStatus.innerHTML = "Aborted";
-        sweepProgress.classList.remove("visible");
-        _sweepAbort = null;
-        return;
-      }
-
-      const end = Math.min(idx + CHUNK, values.length);
-      for (; idx < end; idx++) {
-        const val = values[idx];
-        const p = { ...params, [param]: val };
-        const regime = detectRegime(sweepModelArg, p, xlim, ylim, display, 60, 0.05);
-        const fps = findFixedPoints(fProj, p, xlim, ylim, 15);
-        results.push({ param_value: val, regime, num_fixed_points: fps.length });
-        for (const fp of fps) allFps.push([val, fp[0], fp[1], fp[2]]);
-      }
-
-      const pct = Math.round((idx / values.length) * 100);
-      sweepProgressBar.style.width = pct + "%";
-      sweepProgressText.textContent = pct + "%";
-
-      // Live render with partial data
-      _renderSweepData(results, allFps, param);
-
-      if (idx < values.length) {
-        setTimeout(step, 0);
-      } else {
-        model.set("sweep_results", results);
-        model.set("sweep_fixed_points", allFps);
-        model.set("sweep_param", param);
-        if (!isStandalone) model.save_changes();
-        _sweepAbort = null;
-        sweepBtn.disabled = false;
-        sweepStatus.innerHTML = "";
-        sweepProgress.classList.remove("visible");
-      }
-    }
-
-    step();
-  });
-
-  // ═════════════════════════════════════════════════════════════
-  //  RENDERERS (same canvas drawing as before)
-  // ═════════════════════════════════════════════════════════════
-
-  function _drawPhasePlane(ctx, w, h) {
-    const xlim = model.get("xlim");
-    const ylim = model.get("ylim");
-    const stateNames = model.get("state_names");
-    const mname = model.get("model_name");
-    const def = (mname === 'custom' && model.get('model_spec'))
-      ? (() => { try { return compileModelSpec(model.get('model_spec')); } catch(e) { return MODELS.wilson_cowan; } })()
-      : (MODELS[mname] || MODELS.wilson_cowan);
-    const display = model.get("display") || def.display || [0, 1];
-    const is1D = display.length === 1;
-
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#fafafa";
-    ctx.fillRect(0, 0, w, h);
-
-    if (is1D) {
-      // 1-D mode: draw dx/dt vs x
-      drawAxes(ctx, w, h, xlim, [-2, 2], stateNames[display[0]], "d" + stateNames[display[0]] + "/dt");
-    } else {
-      drawAxes(ctx, w, h, xlim, ylim, stateNames[display[0]], stateNames[display[1]]);
-    }
-
-    // Nullclines
-    if (model.get("show_nullclines")) {
-      const ncX = model.get("nullcline_x");
-      if (ncX && ncX.length > 0) {
-        ctx.fillStyle = "#2196F3";
-        for (const [wx, wy] of ncX) {
-          const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
-          ctx.beginPath(); ctx.arc(sx, sy, 1.8, 0, Math.PI * 2); ctx.fill();
-        }
-      }
-      const ncY = model.get("nullcline_y");
-      if (ncY && ncY.length > 0) {
-        ctx.fillStyle = "#f44336";
-        for (const [wx, wy] of ncY) {
-          const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
-          ctx.beginPath(); ctx.arc(sx, sy, 1.8, 0, Math.PI * 2); ctx.fill();
-        }
-      }
-    }
-
-    // Vector field
-    if (model.get("show_vector_field")) {
-      const vf = model.get("vector_field");
-      if (vf && vf.length > 0) {
-        for (const [wx, wy, dx, dy] of vf) {
-          const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
-          const screenDx = (dx / (xlim[1] - xlim[0])) * w;
-          const screenDy = (-dy / (ylim[1] - ylim[0])) * h;
-          const mag = Math.sqrt(screenDx * screenDx + screenDy * screenDy);
-          if (mag < 1e-10) continue;
-          const ndx = screenDx / mag, ndy = screenDy / mag;
-          const arrowLen = Math.min(14, mag * 0.3);
-          drawArrow(ctx, sx, sy, sx + ndx * arrowLen, sy + ndy * arrowLen, "#ccc", 3);
-        }
-      }
-    }
-
-    // Fixed points
-    if (model.get("show_fixed_points")) {
-      const fps = model.get("fixed_points");
-      if (fps && fps.length > 0) {
-        for (const [wx, wy, stability] of fps) {
-          const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
-          drawFixedPointMarker(ctx, sx, sy, stability, 7);
-        }
-      }
-    }
-
-    // Trajectory
-    if (model.get("show_trajectory")) {
-      const traj = model.get("trajectory");
-      if (traj && traj.length > 1) {
-        ctx.strokeStyle = "#4CAF50"; ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        const proj0 = [traj[0][display[0] + 1]];
-        if (!is1D) proj0.push(traj[0][display[1] + 1]);
-        const [sx0, sy0] = is1D
-          ? worldToScreen(proj0[0], 0, xlim, [-2, 2], w, h)
-          : worldToScreen(proj0[0], proj0[1], xlim, ylim, w, h);
-        ctx.moveTo(sx0, sy0);
-        for (let i = 1; i < traj.length; i++) {
-          const proj = [traj[i][display[0] + 1]];
-          if (!is1D) proj.push(traj[i][display[1] + 1]);
-          const [sx, sy] = is1D
-            ? worldToScreen(proj[0], 0, xlim, [-2, 2], w, h)
-            : worldToScreen(proj[0], proj[1], xlim, ylim, w, h);
-          ctx.lineTo(sx, sy);
-        }
-        ctx.stroke();
-        // Initial condition marker
-        ctx.beginPath(); ctx.arc(sx0, sy0, 5, 0, Math.PI * 2);
-        ctx.fillStyle = "#FF9800"; ctx.fill();
-        ctx.strokeStyle = "#333"; ctx.lineWidth = 1; ctx.stroke();
-      }
-    }
-  }
-
-  function renderPhasePlane() {
-    _drawPhasePlane(phaseCtx, phaseCanvas.width, phaseCanvas.height);
-  }
-
-  function exportToSVG() {
-    const w = phaseCanvas.width;
-    const h = phaseCanvas.height;
-    const c2s = new C2S(w, h);
-    _drawPhasePlane(c2s, w, h);
-    const svg = c2s.getSerializedSvg(true);
-    downloadBlob(new Blob([svg], { type: "image/svg+xml" }), "phase_plane.svg");
-  }
-
-  function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  function renderTimeSeries() {
-    if (displayMode === "phase_plane") return;
-    const w = timeCanvas.width, h = timeCanvas.height;
-    const traj = model.get("trajectory");
-    const stateNames = model.get("state_names");
-    timeCtx.clearRect(0, 0, w, h);
-    timeCtx.fillStyle = "#fafafa"; timeCtx.fillRect(0, 0, w, h);
-    if (!traj || traj.length < 2) return;
-
-    const tVals = traj.map((r) => r[0]);
-    const tMin = tVals[0], tMax = tVals[tVals.length - 1];
-    const pad = 30, plotW = w - 2 * pad, plotH = h - 2 * pad;
-
-    let yMin = Infinity, yMax = -Infinity;
-    for (let d = 0; d < stateNames.length; d++) {
-      const vals = traj.map((r) => r[d + 1]);
-      yMin = Math.min(yMin, ...vals); yMax = Math.max(yMax, ...vals);
-    }
-    if (yMin === yMax) { yMin -= 0.5; yMax += 0.5; }
-    const yMargin = (yMax - yMin) * 0.1;
-    yMin -= yMargin; yMax += yMargin;
-
-    // Grid
-    timeCtx.strokeStyle = "#e9ecef"; timeCtx.lineWidth = 0.5;
-    const nt = 5, ny = 4;
-    for (let i = 0; i <= nt; i++) {
-      const t = tMin + (i / nt) * (tMax - tMin);
-      const sx = pad + ((t - tMin) / (tMax - tMin)) * plotW;
-      timeCtx.beginPath(); timeCtx.moveTo(sx, pad); timeCtx.lineTo(sx, h - pad); timeCtx.stroke();
-    }
-    for (let i = 0; i <= ny; i++) {
-      const y = yMin + (i / ny) * (yMax - yMin);
-      const sy = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;
-      timeCtx.beginPath(); timeCtx.moveTo(pad, sy); timeCtx.lineTo(w - pad, sy); timeCtx.stroke();
-    }
-
-    // Axes
-    timeCtx.strokeStyle = "#333"; timeCtx.lineWidth = 1;
-    timeCtx.beginPath(); timeCtx.moveTo(pad, pad); timeCtx.lineTo(pad, h - pad); timeCtx.lineTo(w - pad, h - pad); timeCtx.stroke();
-
-    // Ticks
-    timeCtx.fillStyle = "#666"; timeCtx.font = "10px sans-serif";
-    timeCtx.textAlign = "center"; timeCtx.textBaseline = "top";
-    for (let i = 0; i <= nt; i++) {
-      const t = tMin + (i / nt) * (tMax - tMin);
-      timeCtx.fillText(t.toFixed(0), pad + ((t - tMin) / (tMax - tMin)) * plotW, h - pad + 2);
-    }
-    timeCtx.textAlign = "right"; timeCtx.textBaseline = "middle";
-    for (let i = 0; i <= ny; i++) {
-      const y = yMin + (i / ny) * (yMax - yMin);
-      timeCtx.fillText(y.toFixed(1), pad - 4, h - pad - ((y - yMin) / (yMax - yMin)) * plotH);
-    }
-
-    timeCtx.textAlign = "center"; timeCtx.textBaseline = "bottom"; timeCtx.font = "bold 11px sans-serif";
-    timeCtx.fillText("Time", w / 2, h - 4);
-    timeCtx.save(); timeCtx.translate(12, h / 2); timeCtx.rotate(-Math.PI / 2);
-    timeCtx.textAlign = "center"; timeCtx.textBaseline = "top"; timeCtx.fillText("State", 0, 0); timeCtx.restore();
-
-    // Curves
-    for (let d = 0; d < stateNames.length; d++) {
-      const color = STATE_COLORS[d % STATE_COLORS.length];
-      timeCtx.strokeStyle = color; timeCtx.lineWidth = 1.5;
-      timeCtx.beginPath();
-      for (let i = 0; i < traj.length; i++) {
-        const t = traj[i][0], y = traj[i][d + 1];
-        const sx = pad + ((t - tMin) / (tMax - tMin)) * plotW;
-        const sy = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;
-        if (i === 0) timeCtx.moveTo(sx, sy); else timeCtx.lineTo(sx, sy);
-      }
-      timeCtx.stroke();
-    }
-
-    // Legend
-    let lx = w - pad - 80, ly = pad + 10;
-    for (let d = 0; d < stateNames.length; d++) {
-      const color = STATE_COLORS[d % STATE_COLORS.length];
-      timeCtx.fillStyle = color; timeCtx.fillRect(lx, ly + d * 16, 12, 3);
-      timeCtx.fillStyle = "#333"; timeCtx.font = "11px sans-serif"; timeCtx.textAlign = "left"; timeCtx.textBaseline = "middle";
-      timeCtx.fillText(stateNames[d], lx + 16, ly + d * 16 + 1.5);
-    }
-  }
-
-  function renderSweep() {
-    if (displayMode === "phase_plane") return;
-    const results = model.get("sweep_results");
-    const fps = model.get("sweep_fixed_points");
-    _renderSweepData(results, fps, model.get("sweep_param"));
-  }
-
-  function _renderSweepData(_results, _fps, _paramName) {
-    const w = sweepCanvas.width, h = sweepCanvas.height;
-    sweepCtx.clearRect(0, 0, w, h);
-    sweepCtx.fillStyle = "#fafafa"; sweepCtx.fillRect(0, 0, w, h);
-    if (!_results || _results.length === 0) return;
-
-    const paramValues = _results.map((r) => r.param_value);
-    const pMin = Math.min(...paramValues), pMax = Math.max(...paramValues);
-    let yMin = Infinity, yMax = -Infinity;
-    if (_fps && _fps.length > 0) {
-      for (const [, x, y] of _fps) { yMin = Math.min(yMin, x, y); yMax = Math.max(yMax, x, y); }
-    } else { yMin = -1; yMax = 1; }
-    const yMargin = (yMax - yMin) * 0.1; yMin -= yMargin; yMax += yMargin;
-    const pad = 35, plotW = w - 2 * pad, plotH = h - 2 * pad;
-
-    // Regime shading
-    if (_results.length > 1) {
-      const dp = (pMax - pMin) / (_results.length - 1);
-      for (let i = 0; i < _results.length; i++) {
-        const r = _results[i];
-        const color = REGIME_COLORS[r.regime] || "#f5f5f5";
-        const sx1 = pad + ((r.param_value - pMin) / (pMax - pMin)) * plotW;
-        const sx2 = pad + ((r.param_value + dp - pMin) / (pMax - pMin)) * plotW;
-        sweepCtx.fillStyle = color; sweepCtx.fillRect(sx1, pad, sx2 - sx1, plotH);
-      }
-    }
-
-    // Grid
-    sweepCtx.strokeStyle = "#e9ecef"; sweepCtx.lineWidth = 0.5;
-    const np = 5, ny = 4;
-    for (let i = 0; i <= np; i++) {
-      const p = pMin + (i / np) * (pMax - pMin);
-      const sx = pad + ((p - pMin) / (pMax - pMin)) * plotW;
-      sweepCtx.beginPath(); sweepCtx.moveTo(sx, pad); sweepCtx.lineTo(sx, h - pad); sweepCtx.stroke();
-    }
-    for (let i = 0; i <= ny; i++) {
-      const y = yMin + (i / ny) * (yMax - yMin);
-      const sy = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;
-      sweepCtx.beginPath(); sweepCtx.moveTo(pad, sy); sweepCtx.lineTo(w - pad, sy); sweepCtx.stroke();
-    }
-
-    // Axes
-    sweepCtx.strokeStyle = "#333"; sweepCtx.lineWidth = 1;
-    sweepCtx.beginPath(); sweepCtx.moveTo(pad, pad); sweepCtx.lineTo(pad, h - pad); sweepCtx.lineTo(w - pad, h - pad); sweepCtx.stroke();
-
-    // Ticks
-    sweepCtx.fillStyle = "#666"; sweepCtx.font = "10px sans-serif"; sweepCtx.textAlign = "center"; sweepCtx.textBaseline = "top";
-    for (let i = 0; i <= np; i++) {
-      const p = pMin + (i / np) * (pMax - pMin);
-      sweepCtx.fillText(p.toFixed(1), pad + ((p - pMin) / (pMax - pMin)) * plotW, h - pad + 2);
-    }
-    sweepCtx.textAlign = "right"; sweepCtx.textBaseline = "middle";
-    for (let i = 0; i <= ny; i++) {
-      const y = yMin + (i / ny) * (yMax - yMin);
-      sweepCtx.fillText(y.toFixed(1), pad - 4, h - pad - ((y - yMin) / (yMax - yMin)) * plotH);
-    }
-
-    sweepCtx.textAlign = "center"; sweepCtx.textBaseline = "bottom"; sweepCtx.font = "bold 11px sans-serif";
-    sweepCtx.fillText(_paramName || "Parameter", w / 2, h - 4);
-    sweepCtx.save(); sweepCtx.translate(12, h / 2); sweepCtx.rotate(-Math.PI / 2);
-    sweepCtx.textAlign = "center"; sweepCtx.textBaseline = "top"; sweepCtx.fillText("Fixed Point State", 0, 0); sweepCtx.restore();
-
-    // Fixed points
-    if (_fps && _fps.length > 0) {
-      for (const [pval, x, y, stability] of _fps) {
-        const sx = pad + ((pval - pMin) / (pMax - pMin)) * plotW;
-        const sy1 = h - pad - ((x - yMin) / (yMax - yMin)) * plotH;
-        const sy2 = h - pad - ((y - yMin) / (yMax - yMin)) * plotH;
-        drawFixedPointMarker(sweepCtx, sx, sy1, stability, 3);
-        drawFixedPointMarker(sweepCtx, sx, sy2, stability, 3);
-      }
-    }
-  }
-
-  // ═════════════════════════════════════════════════════════════
-  //  LIVE EDITOR with debounced auto-save and state machine
-  // ═════════════════════════════════════════════════════════════
-
+`);
+
+  const editorToggle = element.querySelector('.ppw-editor-toggle');
+  const editorPanel = element.querySelector('.ppw-editor-panel');
+  const editorStateTable = editorPanel.querySelector('.ppw-editor-state-table tbody');
+  const editorParamTable = editorPanel.querySelector('.ppw-editor-param-table tbody');
+  const editorEquationsDiv = editorPanel.querySelector('.ppw-editor-equations');
+  const editorApplyBtn = editorPanel.querySelector('.ppw-editor-apply');
+  const editorCopyBtn = editorPanel.querySelector('.ppw-editor-copy');
+  const editorError = editorPanel.querySelector('.ppw-editor-error');
+  const editorStatus = editorPanel.querySelector('.ppw-editor-status');
   let _editorOpen = false;
   let _editorDebounceTimer = null;
   let _editorRequestId = 0;
@@ -15645,7 +15753,7 @@ export function render({ model, el }) {
   }
 
   function _markEquationError(name) {
-    const div = editorEquationsDiv.querySelector(`.ppw-editor-equation[data-name="${name}"]`);
+    const div = editorEquationsDiv.querySelector(`.ppw-editor-equation[data-name="${escapeHtml(name)}"]`);
     if (div) div.querySelector(".ppw-ed-expr").classList.add("ppw-error");
   }
 
@@ -15689,7 +15797,7 @@ export function render({ model, el }) {
     let svHtml = "";
     for (const [name, info] of Object.entries(spec.state_vars || {})) {
       const [lo, hi] = info.range || [-1, 1];
-      svHtml += `<tr data-name="${name}"><td>${name}</td><td><input type="number" class="ppw-ed-svmin" value="${lo}"></td><td><input type="number" class="ppw-ed-svmax" value="${hi}"></td></tr>`;
+      svHtml += `<tr data-name="${escapeHtml(name)}"><td>${escapeHtml(name)}</td><td><input type="number" class="ppw-ed-svmin" value="${lo}"></td><td><input type="number" class="ppw-ed-svmax" value="${hi}"></td></tr>`;
     }
     editorStateTable.innerHTML = svHtml;
 
@@ -15697,25 +15805,21 @@ export function render({ model, el }) {
     for (const [name, info] of Object.entries(spec.parameters || {})) {
       const [lo, hi] = info.range || [-1, 1];
       const step = info.step || (hi - lo) / 500;
-      pHtml += `<tr data-name="${name}"><td>${name}</td><td><input type="number" class="ppw-ed-pdef" value="${info.default}"></td><td><input type="number" class="ppw-ed-pmin" value="${lo}"></td><td><input type="number" class="ppw-ed-pmax" value="${hi}"></td><td><input type="number" class="ppw-ed-pstep" value="${step}"></td></tr>`;
+      pHtml += `<tr data-name="${escapeHtml(name)}"><td>${escapeHtml(name)}</td><td><input type="number" class="ppw-ed-pdef" value="${info.default}"></td><td><input type="number" class="ppw-ed-pmin" value="${lo}"></td><td><input type="number" class="ppw-ed-pmax" value="${hi}"></td><td><input type="number" class="ppw-ed-pstep" value="${step}"></td></tr>`;
     }
     editorParamTable.innerHTML = pHtml;
 
     let eqHtml = "";
     for (const [name, expr] of Object.entries(spec.equations || {})) {
       const readonly = expr.startsWith("/*") ? "readonly" : "";
-      eqHtml += `<div class="ppw-editor-equation" data-name="${name}"><label>d${name}/dt =</label><textarea class="ppw-ed-expr" ${readonly}>${expr}</textarea></div>`;
+      eqHtml += `<div class="ppw-editor-equation" data-name="${escapeHtml(name)}"><label>d${escapeHtml(name)}/dt =</label><textarea class="ppw-ed-expr" ${readonly}>${escapeHtml(expr)}</textarea></div>`;
     }
     editorEquationsDiv.innerHTML = eqHtml;
 
     _clearPerFieldErrors();
     _setEditorState("IDLE");
 
-    // Attach debounced input listeners to all editable fields
-    editorPanel.querySelectorAll("input, textarea").forEach((el) => {
-      if (el.readOnly) return;
-      el.addEventListener("input", onEditorInput);
-    });
+    // Input handling is delegated to this panel's lifecycle scope.
   }
 
   function onEditorInput() {
@@ -15724,8 +15828,8 @@ export function render({ model, el }) {
     editorError.classList.remove("visible");
     editorError.textContent = "";
 
-    if (_editorDebounceTimer) clearTimeout(_editorDebounceTimer);
-    _editorDebounceTimer = setTimeout(() => {
+    if (_editorDebounceTimer) scope.cancel(_editorDebounceTimer);
+    _editorDebounceTimer = scope.later(() => {
       const thisRequestId = ++_editorRequestId;
       _tryAutoApply(thisRequestId);
     }, EDITOR_DEBOUNCE_MS);
@@ -15761,11 +15865,8 @@ export function render({ model, el }) {
 
     if (requestId !== _editorRequestId) return;
 
-    model.set("model_spec", spec);
-    model.set("model_name", "custom");
-    if (!isStandalone) model.save_changes();
+    controller.applySpec(spec);
     _setEditorState("VALID");
-    computeAll();
   }
 
   function buildModelSpec() {
@@ -15800,20 +15901,27 @@ export function render({ model, el }) {
       state_vars,
       parameters,
       equations,
-      display: [0, stateNamesList.length > 1 ? 1 : 0],
+      display: model.get('display') || (stateNamesList.length > 1 ? [0, 1] : [0]),
       integrator: model.get("integrator") || "rk4",
-      noise_per_var: model.get("noise_sigma") || null,
+      noise_per_var: model.get("noise_enable") ? model.get("noise_sigma") : null,
     };
   }
 
   function validateSpec(spec) {
     const errors = [];
     const equationErrors = [];
+    if (!Object.keys(spec.equations).length) errors.push('No editable equations. Load a custom model to edit its equations.');
+    for (const [name, info] of Object.entries(spec.state_vars)) {
+      if (!info.range.every(Number.isFinite) || info.range[0] >= info.range[1]) errors.push(`State '${name}': use increasing finite bounds`);
+    }
+    for (const [name, info] of Object.entries(spec.parameters)) {
+      if (![...info.range, info.default, info.step].every(Number.isFinite) || info.range[0] >= info.range[1] || info.default < info.range[0] || info.default > info.range[1] || info.step <= 0) errors.push(`Parameter '${name}': check bounds, default and positive step`);
+    }
     for (const [name, exprStr] of Object.entries(spec.equations)) {
       try {
         nerdamer(exprStr);
       } catch (e) {
-        errors.push(`Equation '${name}': ${e.message || "parse error"}`);
+        errors.push(`Equation '${escapeHtml(name)}': ${e.message || "parse error"}`);
         equationErrors.push(name);
       }
     }
@@ -15822,7 +15930,7 @@ export function render({ model, el }) {
 
   function applyEditor() {
     // Manual apply — force immediate application regardless of debounce
-    if (_editorDebounceTimer) clearTimeout(_editorDebounceTimer);
+    if (_editorDebounceTimer) scope.cancel(_editorDebounceTimer);
     _editorRequestId++;
     _tryAutoApply(_editorRequestId);
   }
@@ -15832,113 +15940,306 @@ export function render({ model, el }) {
     const json = JSON.stringify(spec, null, 2);
     navigator.clipboard.writeText(json).then(() => {
       _setEditorStatus("Spec copied to clipboard!");
-      setTimeout(() => { if (_editorState === "IDLE") _setEditorStatus(""); }, 2000);
+      scope.later(() => { if (_editorState === "IDLE") _setEditorStatus(""); }, 2000);
     }).catch(() => {
       _setEditorStatus("Failed to copy — see browser console");
       console.log(json);
     });
   }
 
-  editorToggle.addEventListener("click", toggleEditor);
-  editorApplyBtn.addEventListener("click", applyEditor);
-  editorCopyBtn.addEventListener("click", copySpec);
-  el.querySelector(".ppw-export-svg").addEventListener("click", exportToSVG);
 
-  // TikZ export requires a live Python kernel; disabled in standalone.
-  const tikzBtn = el.querySelector(".ppw-export-tikz");
-  if (isStandalone) {
-    tikzBtn.disabled = true;
-    tikzBtn.title = "TikZ export requires a Jupyter kernel";
-  }
-  tikzBtn.addEventListener("click", () => {
-    if (isStandalone) {
-      alert("TikZ export requires a Jupyter kernel. Use widget.export_tikz('file.tex') in a notebook cell instead.");
-      return;
-    }
-    model.send({ type: "export_tikz" });
+  scope.on(editorPanel, 'input', event => {
+    if (event.target.matches('input, textarea') && !event.target.readOnly) onEditorInput();
   });
-
-  // Listen for TikZ data coming back from the Python kernel
-  if (!isStandalone) {
-    model.on('msg:custom', (msg) => {
-      if (msg && msg.type === 'tikz_data') {
-        const blob = new Blob([msg.content], { type: 'application/x-tex' });
-        downloadBlob(blob, msg.filename || 'phase_plane.tex');
-      }
-    });
-  }
-
-  // ═════════════════════════════════════════════════════════════
-  //  INITIALISATION
-  // ═════════════════════════════════════════════════════════════
-
-  populateModelSelector();
-  createParamSliders(model.get("param_info"), model.get("params"));
-  updateLimitInputs();
-
-  // Set up state selectors and clamped sliders for the initial model
-  const _initModelName = model.get("model_name");
-  let _initDef;
-  if (_initModelName === 'custom' && model.get('model_spec')) {
+  scope.on(editorToggle, 'click', () => { toggleEditor(); editorToggle.setAttribute('aria-expanded', String(_editorOpen)); });
+  scope.on(editorApplyBtn, 'click', applyEditor);
+  scope.on(editorCopyBtn, 'click', copySpec);
+  scope.cleanup(() => { clearTimeout(_editorDebounceTimer); _editorRequestId++; });
+  return mountedPanel(element, scope);
+}
+// Experimental task-oriented compositions. All controls/plots are the same panel
+// factories as the full explorer; switching layouts never clones the experiment.
+function mountReadout({ model, document: doc }) {
+  const scope = panelScope(), element = panelElement(doc, 'ppw-readout');
+  const builtinEquations = {
+    fitzhugh_nagumo: ['dv/dt = v − v³/3 − w + I', 'dw/dt = ε (v + a − b w)'],
+    wilson_cowan: ['dE/dt = −E + Sₑ(aee E − aei I + Pe)', 'dI/dt = −I + Sᵢ(aie E − aii I + Pi)'],
+    mpr: ['dr/dt = Δ/π + 2 r v', 'dv/dt = v² + η̄ + J r + I − (πr)²'],
+    hindmarsh_rose: ['dx/dt = y − a x³ + b x² − z + I', 'dy/dt = c − d x² − y', 'dz/dt = r (s (x − xr) − z)'],
+  };
+  return mountedPanel(element, scope, () => {
+    element.replaceChildren();
+    function text(tag, value) { const node = doc.createElement(tag); node.textContent = value; element.append(node); return node; }
+    text('h3', 'Model & current state');
     const spec = model.get('model_spec');
-    if (spec && spec.equations && Object.keys(spec.equations).length > 0) {
-      try { _initDef = compileModelSpec(spec); } catch (e) { _initDef = MODELS.wilson_cowan; }
-    } else { _initDef = MODELS.wilson_cowan; }
-  } else { _initDef = MODELS[_initModelName] || MODELS.wilson_cowan; }
-  const _initDisplay = model.get("display") || _initDef.display || [0, 1];
-  populateStateSelectors(_initDef, _initDisplay);
-  const _initClamped = model.get("clamped") || _initDef.stateVars.map((_, i) => {
-    const lims = (_initDef.defaultLims && _initDef.defaultLims[i]) || [-1, 1];
-    return (lims[0] + lims[1]) / 2;
+    const equations = model.get('model_name') === 'custom' ? Object.entries(spec?.equations || {}).map(([key, value]) => `d${key}/dt = ${value}`) : builtinEquations[model.get('model_name')] || [];
+    for (const equation of equations) text('code', equation);
+    text('p', Object.entries(model.get('params') || {}).map(([key, value]) => `${key} = ${Number(value).toPrecision(3)}`).join(' · '));
+    const display = model.get('display') || [0, 1], names = model.get('state_names') || [];
+    text('p', `Initial condition: ${names[display[0]]} = ${Number(model.get('x0')).toFixed(3)}${display.length > 1 ? `, ${names[display[1]]} = ${Number(model.get('y0')).toFixed(3)}` : ''}`);
+    text('h3', names.length > 2 ? 'Equilibria of the displayed slice' : 'Equilibria');
+    const points = model.get('fixed_points') || [];
+    if (!points.length) text('p', 'No equilibria found in the current window.');
+    for (const [x, y, stability] of points.slice(0, 12)) text('p', `${Number(x).toFixed(3)}, ${Number(y).toFixed(3)} — ${stability.replaceAll('_', ' ')}`);
+    if (points.length > 12) text('p', `${points.length - 12} more points in this window`);
+    text('small', `${model.get('integrator') || 'rk4'} · dt = 0.01 · duration ${model.get('t_max')}${model.get('noise_enable') ? ` · noise seed ${model.get('noise_seed')}` : ' · deterministic'}`);
+    if (names.length > 2) text('p', 'Nullclines/equilibria describe a clamped slice; trajectories integrate the full system.');
   });
-  createClampedSliders(_initDef, _initClamped, _initDisplay);
-  integratorSelect.value = model.get('integrator') || 'rk4';
-  noiseEnable.checked = model.get('noise_enable') || false;
-  createNoiseSliders();
+}
 
-  // In standalone mode the model may already have data; otherwise compute it now
-  const hasData = (model.get("trajectory") || []).length > 0;
-  if (!hasData || isStandalone) {
-    computeAll();
-  } else {
-    renderPhasePlane();
-    renderTimeSeries();
-    renderSweep();
-  }
-
-  // ── React to Python-side model changes ──
-  // When model_spec changes (set via set_model_spec in Python),
-  // re-populate controls and re-compute
-  model.on('change:model_spec', () => {
-    const spec = model.get('model_spec');
-    if (model.get('model_name') === 'custom' && spec && spec.equations) {
-      populateModelSelector();
-      const paramInfo = model.get('param_info') || {};
-      const params = model.get('params') || {};
-      createParamSliders(paramInfo, params);
-      updateLimitInputs();
-      // Rebuild state selectors and clamped sliders
-      const stateVars = model.get('state_names') || [];
-      const display = model.get('display') || [0, Math.min(1, stateVars.length - 1)];
-      try {
-        const def = compileModelSpec(spec);
-        populateStateSelectors(def, display);
-        const clamped = model.get('clamped') || stateVars.map((_, i) => {
-          const lims = (def.defaultLims && def.defaultLims[i]) || [-5, 5];
-          return (lims[0] + lims[1]) / 2;
-        });
-        createClampedSliders(def, clamped, display);
-      } catch (e) {
-        console.warn('Error during model_spec change:', e);
-      }
-      computeAll();
+function mountPresentation(context, kind = context.configuration.get('presentation')) {
+  const { model, controller, document: doc } = context;
+  const scope = panelScope(), groups = new Set();
+  const element = panelElement(doc, `ppw-composition ppw-${kind === 'comparison' ? 'lens' : kind}`);
+  element.dataset.presentation = kind;
+  let expanded = null, popover = null;
+  function group(container, names, { primary = false, fit = false } = {}) {
+    const components = [];
+    const configuration = { get: key => {
+      if (key !== 'visible_parameters') return context.configuration.get(key);
+      if (!primary) return null;
+      const chosen = context.configuration.get(key);
+      if (chosen != null) return chosen;
+      const keys = Object.keys(model.get('param_info') || {});
+      const preferred = ['I', 'Pe', 'a'].filter(key => keys.includes(key));
+      return preferred.length ? preferred.slice(0, 2) : keys.slice(0, 2);
+    } };
+    for (const name of names) {
+      const factory = name === 'details' ? mountReadout : PANEL_FACTORIES[name];
+      const component = factory({ ...context, configuration });
+      component.element.classList.add('ppw-panel'); component.element.dataset.panel = name;
+      if (fit && component.element.querySelector('canvas')) component.element.setAttribute('data-fit-plot', '');
+      components.push(component); container.append(component.element);
     }
+    const instance = {
+      update() { for (const component of components) component.update(); },
+      dispose() { groups.delete(instance); for (const component of components) component.dispose(); },
+    };
+    groups.add(instance); instance.update(); return instance;
+  }
+  function button(label, className, action, container = toolbar) {
+    const node = doc.createElement('button'); node.type = 'button'; node.textContent = label; node.className = className;
+    scope.on(node, 'click', () => action(node)); container.append(node); return node;
+  }
+  const toolbar = doc.createElement('header'); toolbar.className = 'ppw-stage-toolbar'; element.append(toolbar);
+  const title = doc.createElement('strong'); title.className = 'ppw-stage-title'; toolbar.append(title);
+  const badges = doc.createElement('span'); badges.className = 'ppw-stage-badges'; toolbar.append(badges);
+  function closePopover(restore = false) {
+    if (!popover) return;
+    const { container, instance, trigger, listeners } = popover; popover = null;
+    listeners.dispose(); instance.dispose(); container.remove(); trigger.setAttribute('aria-expanded', 'false'); if (restore) trigger.focus();
+  }
+  const inspect = button('Inspect', 'ppw-inspect', trigger => {
+    if (popover) { closePopover(true); return; }
+    const container = panelElement(doc, 'ppw-details-popover'); container.setAttribute('role', 'region'); container.setAttribute('aria-label', 'Experiment details');
+    element.append(container);
+    const close = doc.createElement('button'); close.textContent = 'Close details'; container.append(close);
+    const listeners = panelScope(); listeners.on(close, 'click', () => closePopover(true));
+    const instance = group(container, ['details']);
+    popover = { container, instance, trigger, listeners }; trigger.setAttribute('aria-expanded', 'true'); close.focus();
   });
+  inspect.setAttribute('aria-expanded', 'false');
+  scope.on(doc, 'pointerdown', event => { if (popover && !popover.container.contains(event.target) && !inspect.contains(event.target)) closePopover(); });
+  scope.on(doc, 'keydown', event => { if (event.key === 'Escape' && popover) { event.preventDefault(); closePopover(true); } });
+  function closeExpanded() {
+    if (!expanded) return;
+    const { dialog, composition, trigger, listeners } = expanded; expanded = null;
+    listeners.dispose(); composition.dispose(); if (dialog.open && dialog.close) dialog.close(); dialog.remove();
+    if (trigger.isConnected) trigger.focus();
+  }
+  if (!context.inDialog) button('Expand', 'ppw-expand', trigger => {
+    if (expanded) return;
+    closePopover();
+    const dialog = doc.createElement('dialog'); dialog.className = 'ppw-widget ppw-expanded-workspace'; dialog.setAttribute('aria-label', 'Expanded experiment bench');
+    const close = doc.createElement('button'); close.textContent = 'Close workspace'; close.className = 'ppw-close-workspace'; dialog.append(close);
+    const composition = mountPresentation({ ...context, inDialog: true }, 'bench'); dialog.append(composition.element);
+    const listeners = panelScope(); expanded = { dialog, composition, trigger, listeners }; doc.body.append(dialog);
+    listeners.on(close, 'click', closeExpanded); listeners.on(dialog, 'close', closeExpanded);
+    if (dialog.showModal) dialog.showModal(); else { dialog.setAttribute('open', ''); dialog.setAttribute('role', 'dialog'); }
+    composition.update(); close.focus();
+  });
+  button('Reset', 'ppw-stage-reset', () => controller.reset());
+  const error = doc.createElement('div'); error.className = 'ppw-presentation-error'; error.setAttribute('role', 'alert'); error.hidden = true; element.append(error);
+  const body = doc.createElement('div'); body.className = 'ppw-stage-body'; element.append(body);
+  const footer = doc.createElement('footer'); footer.className = 'ppw-stage-footer'; element.append(footer);
+  function slot(parent, className) { const node = doc.createElement('div'); node.className = className; parent.append(node); return node; }
+  function inspector(container, initial = 'details') {
+    const label = doc.createElement('label'); label.className = 'ppw-tool-picker'; label.append(doc.createTextNode('Tool '));
+    const select = doc.createElement('select'); select.setAttribute('aria-label', 'Inspector section'); label.append(select); container.append(label);
+    const tools = { details: 'Model & equilibria', parameters: 'All parameters', noise: 'Noise & integrator', layers: 'Plot layers', projection: 'Projection / fixed state', limits: 'Axes & duration', sweep: 'Parameter sweep', editor: 'Equation editor', export: 'Export', model: 'Choose model' };
+    for (const [value, text] of Object.entries(tools)) { const option = doc.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
+    const content = slot(container, 'ppw-inspector-content'); let current;
+    function choose() { current?.dispose(); current = group(content, [select.value]); }
+    select.value = initial; choose(); scope.on(select, 'change', choose);
+    return () => current?.dispose();
+  }
+  if (kind === 'figure' || kind === 'drawer') {
+    const plot = slot(body, 'ppw-primary-plot'); group(plot, ['phase_plane'], { fit: true });
+    group(footer, ['parameters'], { primary: true });
+    if (kind === 'drawer') {
+      const drawer = slot(body, 'ppw-instrument-drawer'); drawer.hidden = true; let disposeInspector;
+      const toggle = button('Controls', 'ppw-drawer-toggle', () => {
+        const open = drawer.hidden; drawer.hidden = !open;
+        toggle.setAttribute('aria-expanded', String(open)); element.classList.toggle('ppw-drawer-open', open);
+        if (open) disposeInspector = inspector(drawer, 'parameters');
+        else { disposeInspector?.(); drawer.replaceChildren(); }
+        update();
+      });
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  } else if (kind === 'bench') {
+    const plot = slot(body, 'ppw-primary-plot'); group(plot, ['phase_plane'], { fit: true });
+    const right = slot(body, 'ppw-bench-secondary');
+    group(slot(right, 'ppw-secondary-plot'), ['time_series'], { fit: true });
+    inspector(slot(right, 'ppw-bench-inspector'));
+    group(footer, ['parameters'], { primary: true });
+  } else if (kind === 'comparison') {
+    group(slot(body, 'ppw-primary-plot'), ['phase_plane'], { fit: true });
+    group(slot(body, 'ppw-secondary-plot'), ['time_series'], { fit: true });
+    group(footer, ['parameters'], { primary: true }); group(footer, ['comparison']);
+    const caption = doc.createElement('p'); caption.className = 'ppw-comparison-caption'; caption.textContent = 'Freeze a scene, then move a slider. Muted nullclines, ringed equilibria and dashed paths stay fixed; saturated colors are the live experiment.'; footer.append(caption);
+  } else if (kind === 'lesson') {
+    const nav = doc.createElement('nav'); nav.className = 'ppw-task-tabs'; nav.setAttribute('aria-label', 'Lesson task'); element.insertBefore(nav, body);
+    let taskGroups = [], active = 'Explore';
+    const descriptions = { Explore: 'Explore excitability: move I, or click the phase plane to change initial conditions.', Observe: 'Observe the full-system trajectory and use playback to connect the two plots.', Compare: 'Freeze the current scene, then adjust I. Gray geometry and dashed paths retain the baseline.', Sweep: 'Scan a parameter range. Switching away cancels a running sweep; completed results are retained.' };
+    const description = doc.createElement('p'); description.className = 'ppw-task-description'; element.insertBefore(description, body);
+    const buttons = [];
+    function choose(task) {
+      active = task; for (const current of taskGroups) current.dispose(); taskGroups = [];
+      body.replaceChildren(); footer.replaceChildren(); description.textContent = descriptions[task]; element.dataset.task = task;
+      for (const node of buttons) node.setAttribute('aria-pressed', String(node.textContent === task));
+      const names = task === 'Sweep' ? ['sweep'] : task === 'Explore' ? ['phase_plane'] : ['phase_plane', 'time_series'];
+      for (const name of names) taskGroups.push(group(slot(body, name === 'phase_plane' ? 'ppw-primary-plot' : 'ppw-secondary-plot'), [name], { fit: name !== 'sweep' }));
+      if (task !== 'Sweep') taskGroups.push(group(footer, ['parameters'], { primary: true }));
+      if (task === 'Compare') taskGroups.push(group(footer, ['comparison']));
+      update();
+    }
+    for (const task of Object.keys(descriptions)) buttons.push(button(task, 'ppw-task-tab', () => choose(task), nav));
+    choose(active);
+  } else { throw new Error('Unknown presentation: ' + kind); }
+  function update() {
+    title.textContent = { figure: 'Interactive figure', bench: 'Experiment bench', drawer: 'Instrument drawer', comparison: 'Comparison lens', lesson: 'Guided lesson' }[kind];
+    badges.textContent = `${(model.get('model_name') || '').replaceAll('_', ' ')}${model.get('noise_enable') ? ' · noise on' : ''}${model.get('reference_trajectory')?.length ? ' · frozen reference' : ''}${model.get('sweep_running') ? ' · sweep running' : ''}`;
+    error.textContent = controller.error?.message || ''; error.hidden = !controller.error;
+    for (const instance of [...groups]) instance.update();
+    expanded?.composition.update();
+  }
+  scope.cleanup(closePopover); scope.cleanup(closeExpanded);
+  return { element, update, dispose() { scope.dispose(); for (const instance of [...groups]) instance.dispose(); element.remove(); } };
+}
+export async function render({ model, el, options = null, signal }) {
+  const configuration = options || model;
+  try {
+    const ref = model.get('experiment');
+    const id = typeof ref === 'string' ? ref.replace(/^IPY_MODEL_/, '') : model.get('experiment_id');
+    let shared = ref && typeof ref.get === 'function' ? ref : model;
+    if (shared === model && id) {
+      if (!model.widget_manager) throw new Error('Widget manager unavailable; cannot resolve the shared experiment');
+      shared = await model.widget_manager.get_model(id);
+      if (!shared || typeof shared.get !== 'function') throw new Error('Shared experiment was not found');
+    } else if (shared === model && ref) {
+      throw new Error('Invalid shared experiment reference');
+    }
+    if (signal?.aborted) return () => {};
+    return mountConfigured(shared, el, configuration);
+  } catch (error) {
+    if (signal?.aborted) return () => {};
+    el.replaceChildren();
+    const message = el.ownerDocument.createElement('div');
+    message.setAttribute('role', 'alert');
+    message.textContent = `Cannot display experiment: ${error.message}`;
+    el.appendChild(message);
+    return () => el.replaceChildren();
+  }
+}
 
+
+// A view owns presentation only. Computation and async work live on its controller.
+const PANEL_FACTORIES = {
+  model: mountModel, parameters: mountParameters, projection: mountProjection,
+  limits: mountLimits, noise: mountNoise, layers: mountLayers,
+  comparison: mountComparison, export: mountExport, editor: mountEditor,
+  phase_plane: mountPhasePlane, time_series: mountTimeSeries, sweep: mountSweep,
+};
+const DEFAULT_PANELS = ['model', 'parameters', 'projection', 'limits', 'noise', 'layers', 'comparison', 'export', 'editor', 'phase_plane', 'time_series', 'sweep'];
+
+function mountConfigured(model, el, configuration) {
+  const controller = acquireExperiment(model);
+  const doc = el.ownerDocument;
+  let components = [], unsubscribe = () => {}, root, errorMessage, disposed = false, localPresentation = null;
+  function update() {
+    if (disposed) return;
+    let error = controller.error;
+    for (const component of components) {
+      try { component.update(); }
+      catch (failure) { error ||= failure; }
+    }
+    errorMessage.textContent = error?.message || '';
+    errorMessage.hidden = !error;
+  }
+  function unmount() {
+    unsubscribe();
+    for (const component of components.splice(0)) component.dispose();
+    el.replaceChildren();
+  }
+  function mount() {
+    unmount();
+    const requested = configuration.get('panels') || [];
+    const displayMode = configuration.get('display_mode') || 'full';
+    const names = requested.length ? requested : displayMode === 'phase_plane' ? ['phase_plane'] : DEFAULT_PANELS;
+    root = doc.createElement('div');
+    const presentation = localPresentation || configuration.get('presentation') || 'panels';
+    root.className = presentation === 'panels' ? 'ppw-widget ppw-component-layout' : 'ppw-widget ppw-presentation-root';
+    root.classList.toggle('ppw-phase-only', !requested.length && displayMode === 'phase_plane');
+    root.classList.toggle('ppw-vertical', configuration.get('panel_layout') === 'vertical');
+    root.classList.toggle('ppw-single-panel', names.length === 1);
+    root.classList.toggle('ppw-single-plot', presentation === 'panels' && names.includes('phase_plane') && !names.includes('time_series'));
+    errorMessage = doc.createElement('div'); errorMessage.className = 'ppw-error';
+    errorMessage.setAttribute('role', 'alert'); errorMessage.hidden = true; root.append(errorMessage);
+    el.append(root);
+    if (configuration.get('view_switcher')) {
+      const scope = panelScope(), picker = panelElement(doc, 'ppw-view-picker');
+      const label = doc.createElement('label'); label.append(doc.createTextNode('View '));
+      const select = doc.createElement('select'); select.className = 'ppw-view-selector'; select.setAttribute('aria-label', 'View layout'); label.append(select);
+      const choices = { figure: 'Interactive figure', bench: '16:9 experiment bench', drawer: 'Instrument drawer', comparison: 'Comparison lens', lesson: 'Guided lesson' };
+      if (presentation === 'panels') choices.panels = 'All panels';
+      for (const [value, text] of Object.entries(choices)) { const option = doc.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
+      select.value = presentation; picker.append(label);
+      const hint = doc.createElement('small'); hint.textContent = 'Experimental layouts · same experiment across views'; picker.append(hint);
+      scope.on(select, 'change', () => {
+        const value = select.value;
+        if (typeof configuration.set === 'function') {
+          configuration.set('presentation', value); configuration.save_changes?.();
+        } else { localPresentation = value; mount(); }
+        root.querySelector('.ppw-view-selector')?.focus();
+      });
+      components.push(mountedPanel(picker, scope, () => {})); root.append(picker);
+    }
+    if (presentation !== 'panels') {
+      const composition = mountPresentation({ model, controller, document: doc, configuration }, presentation);
+      components.push(composition); root.append(composition.element);
+    } else for (const name of names) {
+      const factory = PANEL_FACTORIES[name];
+      if (!factory) throw new Error('Unknown panel: ' + name);
+      const component = factory({ model, controller, document: doc, configuration });
+      component.element.classList.add('ppw-panel');
+      component.element.dataset.panel = name;
+      component.element.setAttribute('aria-label', name.replaceAll('_', ' '));
+      components.push(component); root.append(component.element);
+    }
+    unsubscribe = controller.subscribe(update);
+    update();
+  }
+  const events = ['panels', 'visible_parameters', 'panel_layout', 'display_mode', 'presentation', 'view_switcher'].map(key => 'change:' + key);
+  try { mount(); }
+  catch (error) { unmount(); controller.release(); throw error; }
+  for (const event of events) configuration.on?.(event, mount);
   return () => {
-    // cleanup if needed
+    if (disposed) return;
+    disposed = true;
+    for (const event of events) configuration.off?.(event, mount);
+    unmount(); controller.release();
   };
 }
 
-// Explicit default export for stricter module loaders (marimo)
 export default { render };

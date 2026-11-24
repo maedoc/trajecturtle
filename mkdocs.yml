@@ -76,6 +76,8 @@ nav:
   - Case Studies: case-studies.md
   - Deployment: deployment.md
   - API Reference: api.md
+  - Frontend Development: frontend.md
+  - View Design Lab: view-designs.md
   - Demos: demos/index.md
 
 watch:
