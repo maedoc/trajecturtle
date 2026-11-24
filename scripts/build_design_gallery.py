@@ -16,6 +16,7 @@ const modes = {
   evidence: ['Evidence notebook', 'Capture labeled scenes, preview them without changing the experiment, restore explicitly, or download a reproducible JSON record.'],
   prediction: ['Prediction & reveal', 'Predict an outcome from the nullclines and initial condition, then reveal the deliberately hidden trajectory.'],
   ensemble: ['Stochastic ensemble', 'Compare 2–8 seeded Heun traces, then explicitly use a member. These are individual realizations, not confidence intervals.'],
+  bifurcation: ['AUTO2000 bifurcation', 'Client-side numerical continuation in WebAssembly (1D equilibria, HB -> LC limit cycles, and 2D LP/HB curves).'],
 };
 const style = document.createElement('style');
 style.textContent = `
@@ -59,12 +60,12 @@ def build_design_gallery(output=None):
         model_name="fitzhugh_nagumo", params={"I": .5}, x0=-1., y0=-.5,
         t_max=80., presentation="figure", visible_parameters=["I", "epsilon"],
     )
-    widget.to_standalone_html(output, title="Trajecturtle — View design lab", on_render_js=GALLERY_JS)
+    widget.to_standalone_html(output, title="Trajecturtle — View design lab", on_render_js=GALLERY_JS, include_auto=True)
     print(f"Generated {output.name} ({output.stat().st_size:,} bytes)")
     # The notebook's built-in picker, without the gallery-specific navigation.
     widget.view_switcher = True
     feedback = output.with_name("view-feedback.html")
-    widget.to_standalone_html(feedback, title="Trajecturtle — Switchable explorer")
+    widget.to_standalone_html(feedback, title="Trajecturtle — Switchable explorer", include_auto=True)
     print(f"Generated {feedback.name} ({feedback.stat().st_size:,} bytes)")
 
 

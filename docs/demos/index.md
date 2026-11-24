@@ -2,7 +2,17 @@
 
 Each demo below is a **live, self-contained widget** running entirely in your browser. No Python kernel, no server — just HTML5 Canvas + JavaScript.
 
-Click on the phase plane to set initial conditions, drag sliders to change parameters, and run parameter sweeps to explore bifurcations.
+Click on the phase plane to set initial conditions, drag sliders to change parameters, and run parameter sweeps or AUTO2000 numerical continuation to explore bifurcations.
+
+---
+
+## AUTO2000 Bifurcation Continuation
+
+Client-side numerical continuation running **AUTO2000 compiled to WebAssembly** inside a Web Worker — no Python kernel or server required. Click **Trace Equilibria** to continue the equilibrium branch in `I`, then click any detected Hopf (`HB`) chip to switch onto the periodic-orbit (`LC`) branch or trace 2-parameter (`LP` / `HB`) curves.
+
+**[Open full-width bifurcation demo](bifurcation_auto2000.html){: target="_blank" rel="noopener" }**
+
+<iframe src="bifurcation_auto2000.html" width="100%" height="900" frameborder="0" style="border:1px solid #ddd; border-radius:8px;"></iframe>
 
 ---
 

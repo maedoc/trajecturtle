@@ -16,8 +16,20 @@ const MIME_TYPES = {
 let server;
 let baseUrl;
 let browser;
+let skipReason = '';
 
 before(async () => {
+  const snapChromium = '/snap/bin/chromium';
+  const defaultExecutable = typeof chromium.executablePath === 'function' ? chromium.executablePath() : '';
+  const executablePath = fs.existsSync(snapChromium)
+    ? snapChromium
+    : (defaultExecutable && fs.existsSync(defaultExecutable) ? defaultExecutable : '');
+
+  if (!executablePath) {
+    skipReason = 'No Chromium executable found for Playwright';
+    return;
+  }
+
   server = http.createServer((req, res) => {
     const reqPath = (req.url || '/').split('?')[0];
     if (reqPath === '/test.html') {
@@ -42,7 +54,7 @@ before(async () => {
 
   browser = await chromium.launch({
     headless: true,
-    executablePath: '/snap/bin/chromium',
+    executablePath,
   });
 });
 
@@ -51,7 +63,11 @@ after(async () => {
   if (server) await new Promise((resolve) => server.close(resolve));
 });
 
-test('auto-client + auto2000-worker runs SupHopf (EP+LC), MPR (bidirectional EP+2D LP), custom Nerdamer spec, and cancel()', async () => {
+test('auto-client + auto2000-worker runs SupHopf (EP+LC), MPR (bidirectional EP+2D LP), custom Nerdamer spec, and cancel()', async (t) => {
+  if (skipReason) {
+    t.skip(skipReason);
+    return;
+  }
   const page = await browser.newPage();
   try {
     await page.goto(`${baseUrl}/test.html`);

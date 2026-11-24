@@ -10,7 +10,7 @@ Explore dynamical systems in real time, directly in the browser — in Jupyter, 
 - **Drag parameter sliders** to see nullclines, fixed points, and vector fields update instantly
 - **Switch between state variables** for N-dimensional systems — clamp the rest with sliders
 - **Add noise** to trajectories with the stochastic Heun integrator
-- **Run parameter sweeps** and **AUTO2000 WASM bifurcation continuation** (1D equilibria, `HB -> LC` limit cycles, and 2D `LP`/`HB` curves) directly in the browser
+- **Run parameter sweeps** and **[AUTO2000 WASM bifurcation continuation](demos/index.md#auto2000-bifurcation-continuation)** (1D equilibria, `HB -> LC` limit cycles, and 2D `LP`/`HB` curves) directly in the browser
 - **Define your own models** in Python (SymPy) and they compile to JavaScript automatically
 - **Export to standalone HTML** — works offline, no kernel, no server
 

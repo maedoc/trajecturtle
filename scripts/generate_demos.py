@@ -117,6 +117,28 @@ DEMOS = {
 }
 
 
+def build_bifurcation_demo():
+    """Generate an interactive AUTO2000 WASM bifurcation continuation demo."""
+    out_dir = Path(__file__).parent.parent / "docs" / "demos"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / "bifurcation_auto2000.html"
+
+    widget = PhasePlaneWidget(
+        model_name="fitzhugh_nagumo",
+        params={"a": 0.7, "b": 0.8, "epsilon": 0.08, "I": 0.5},
+        x0=-1.0,
+        y0=-0.5,
+        t_max=100.0,
+        presentation="bifurcation",
+    )
+    widget.to_standalone_html(
+        str(out),
+        title="Trajecturtle — AUTO2000 Bifurcation Continuation",
+        include_auto=True,
+    )
+    print(f"Generated {out.name} ({out.stat().st_size:,} bytes)")
+
+
 def main():
     out_dir = Path(__file__).parent.parent / "docs" / "demos"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -135,6 +157,7 @@ def main():
         widget.to_standalone_html(str(out_path), title=f"Phase Plane: {name}")
         print(f"Generated {out_path.name} ({out_path.stat().st_size:,} bytes)")
 
+    build_bifurcation_demo()
     build_custom_demo()
     from build_design_gallery import build_design_gallery
     build_design_gallery()
