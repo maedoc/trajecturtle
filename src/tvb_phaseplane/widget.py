@@ -551,10 +551,11 @@ if (viewConfigs === null) {{
         fp_block = "\n            ".join(fp_nodes)
 
         # ── parameter annotation ──
-        param_lines = ", ".join(f"{k.replace('_', '\\_')}={v:.4g}" for k, v in self.params.items())
+        param_lines = ", ".join("{}={:.4g}".format(k.replace("_", r"\_"), v) for k, v in self.params.items())
+        escaped_model_name = self.model_name.replace("_", r"\_")
         param_node = (
             r"\path (rel axis cs:0.02,0.98) node[anchor=north west, font=\tiny, align=left] "
-            f"{{{self.model_name.replace('_', '\\_')}\\\\ {param_lines}}};"
+            f"{{{escaped_model_name}\\\\ {param_lines}}};"
         )
 
         tex = (
