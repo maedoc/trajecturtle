@@ -14,11 +14,6 @@ const REGIME_COLORS = {
 
 const STATE_COLORS = ["#2196F3", "#f44336", "#4CAF50", "#FF9800"];
 
-/** Safe exponential that prevents overflow. */
-function expClamp(x) {
-  return Math.exp(Math.max(-709, Math.min(709, x)));
-}
-
 // ═══════════════════════════════════════════════════════════════
 //  canvas2svg (MIT licensed, inlined for self-containment)
 //  https://github.com/gliffy/canvas2svg

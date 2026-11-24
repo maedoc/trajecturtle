@@ -12529,11 +12529,6 @@ const REGIME_COLORS = {
 
 const STATE_COLORS = ["#2196F3", "#f44336", "#4CAF50", "#FF9800"];
 
-/** Safe exponential that prevents overflow. */
-function expClamp(x) {
-  return Math.exp(Math.max(-709, Math.min(709, x)));
-}
-
 // ═══════════════════════════════════════════════════════════════
 //  canvas2svg (MIT licensed, inlined for self-containment)
 //  https://github.com/gliffy/canvas2svg
@@ -13680,6 +13675,11 @@ const C2S = (function() {
 // ═══════════════════════════════════════════════════════════════
 //  MODEL DEFINITIONS  (all computation runs client-side)
 // ═══════════════════════════════════════════════════════════════
+/** Safe exponential that prevents overflow. */
+function expClamp(x) {
+  return Math.exp(Math.max(-709, Math.min(709, x)));
+}
+
 function _sigmoid(x, k, theta) {
   return 1.0 / (1.0 + expClamp(-k * (x - theta)));
 }
@@ -13962,6 +13962,18 @@ function compileModelSpec(spec) {
   };
 }
 
+/** Resolve a model key or custom model spec to a model definition entry.
+ *
+ *  @param {string} modelName - key in MODELS (or 'custom')
+ *  @param {Object} [spec] - custom model_spec dict when modelName === 'custom'
+ *  @returns {Object} model definition entry
+ */
+function resolveModel(modelName, spec) {
+  if (modelName === 'custom') return compileModelSpec(spec);
+  const def = MODELS[modelName];
+  if (!def) throw new Error('Unknown model: ' + modelName);
+  return def;
+}
 /** Create a projected RHS for the 2D phase plane using nerdamer compilation.
  *
  *  Non-displayed state variables are substituted as literal numbers.
@@ -14047,13 +14059,6 @@ function linspace(a, b, n) {
  *  @param {number[]} clamped — full N-dim state vector with clamped values
  *  @returns {Function} f_proj(t, projState, params) → derivatives of displayed vars
  */
-function resolveModel(modelName, spec) {
-  if (modelName === 'custom') return compileModelSpec(spec);
-  const def = MODELS[modelName];
-  if (!def) throw new Error('Unknown model: ' + modelName);
-  return def;
-}
-
 function makeProjectedRHS(modelName, displayIdx, clamped, spec = null, resolved = null) {
   const def = resolved || resolveModel(modelName, spec);
   if (modelName === 'custom') return makeCompiledProjectedRHS(def, displayIdx, clamped);
@@ -14679,6 +14684,208 @@ function runParameterSweep(f, modelName, sweepParam, params, vmin, vmax, n, xlim
   return { results, allFps };
 }
 
+/** Solve N×N linear system A * x = b using Gaussian elimination with partial pivoting.
+ *  Returns solution vector x, or null if A is singular or dimensions are invalid. */
+export function solveLinearSystem(A, b) {
+  const n = Array.isArray(A) ? A.length : 0;
+  if (n < 1 || !Array.isArray(b) || b.length !== n) return null;
+
+  const M = A.map((row) => row.slice());
+  const rhs = b.slice();
+
+  for (let col = 0; col < n; col++) {
+    let pivotRow = col;
+    let pivotAbs = Math.abs(M[col][col]);
+    for (let row = col + 1; row < n; row++) {
+      const val = Math.abs(M[row][col]);
+      if (val > pivotAbs) {
+        pivotAbs = val;
+        pivotRow = row;
+      }
+    }
+    if (!Number.isFinite(pivotAbs) || pivotAbs < 1e-14) return null;
+
+    if (pivotRow !== col) {
+      [M[col], M[pivotRow]] = [M[pivotRow], M[col]];
+      [rhs[col], rhs[pivotRow]] = [rhs[pivotRow], rhs[col]];
+    }
+
+    const diag = M[col][col];
+    for (let row = col + 1; row < n; row++) {
+      const factor = M[row][col] / diag;
+      if (factor === 0) continue;
+      M[row][col] = 0;
+      for (let k = col + 1; k < n; k++) {
+        M[row][k] -= factor * M[col][k];
+      }
+      rhs[row] -= factor * rhs[col];
+    }
+  }
+
+  const x = new Array(n).fill(0);
+  for (let row = n - 1; row >= 0; row--) {
+    let sum = rhs[row];
+    for (let k = row + 1; k < n; k++) {
+      sum -= M[row][k] * x[k];
+    }
+    const val = sum / M[row][row];
+    if (!Number.isFinite(val)) return null;
+    x[row] = val;
+  }
+  return x;
+}
+
+function _vectorNorm(vec) {
+  let sum = 0;
+  for (let i = 0; i < vec.length; i++) {
+    const v = vec[i];
+    if (!Number.isFinite(v)) return Infinity;
+    sum += v * v;
+  }
+  return Math.sqrt(sum);
+}
+
+function _newtonPolishND(def, params, startState, tol, maxIter, eps) {
+  let u = def.bounds ? clampState([...startState], def.bounds) : [...startState];
+  if (u.some((v) => !Number.isFinite(v))) {
+    return { u: [...startState], residual: Infinity, converged: false };
+  }
+  let f0 = def.f(0, u, params);
+  let res0 = _vectorNorm(f0);
+  if (!Number.isFinite(res0)) {
+    return { u, residual: Infinity, converged: false };
+  }
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    if (res0 < tol) {
+      return { u, residual: res0, converged: true };
+    }
+    const J = jacobianND(def.f, u, params, eps);
+    const delta = solveLinearSystem(J, f0.map((v) => -v));
+    if (!delta) break;
+
+    let accepted = false;
+    for (const alpha of [1, 0.5, 0.25, 0.125, 0.0625]) {
+      let cand = u.map((ui, i) => ui + alpha * delta[i]);
+      if (def.bounds) cand = clampState(cand, def.bounds);
+      const fCand = def.f(0, cand, params);
+      const resCand = _vectorNorm(fCand);
+      if (Number.isFinite(resCand) && resCand < res0) {
+        u = cand;
+        f0 = fCand;
+        res0 = resCand;
+        accepted = true;
+        break;
+      }
+    }
+    if (!accepted) break;
+  }
+
+  return { u, residual: res0, converged: res0 < tol };
+}
+
+/** Find a full-N-D steady state of def.f(0, u, params) = 0 using damped Newton-Raphson,
+ *  falling back to deterministic RK4 burn-in and alternative seeds if needed. */
+export function findSteadyStateND(def, params, seedState, opts = {}) {
+  const tol = opts.tol ?? 1e-8;
+  const maxIter = opts.maxIter ?? 40;
+  const eps = opts.eps ?? 1e-6;
+  const burnInT = opts.burnInT ?? 40;
+  const burnInDt = opts.burnInDt ?? 0.05;
+  const dim = def.dim ?? seedState?.length ?? def.defaultLims?.length ?? 2;
+
+  const midpoint = Array.from({ length: dim }, (_, i) => {
+    const lim = def.defaultLims?.[i];
+    return Array.isArray(lim) && lim.length === 2 ? (lim[0] + lim[1]) / 2 : 0;
+  });
+
+  const candidates = [];
+  if (Array.isArray(seedState) && seedState.length === dim) {
+    candidates.push([...seedState]);
+  }
+  if (Array.isArray(opts.fallbackStates)) {
+    for (const fb of opts.fallbackStates) {
+      if (Array.isArray(fb) && fb.length === dim) {
+        candidates.push([...fb]);
+      }
+    }
+  }
+  candidates.push(midpoint);
+
+  let best = { u: [...candidates[0]], residual: Infinity, converged: false };
+  const updateBest = (res) => {
+    if (Number.isFinite(res.residual) && res.residual < best.residual) {
+      best = res;
+    }
+  };
+
+  // Pass 1: direct damped Newton from primary seed
+  const primaryRes = _newtonPolishND(def, params, candidates[0], tol, maxIter, eps);
+  updateBest(primaryRes);
+  if (primaryRes.converged) return primaryRes;
+
+  // Pass 2: RK4 burn-in from primary seed, then Newton polish
+  const primaryBurn = rk4(def, candidates[0], 0, burnInT, burnInDt, params);
+  if (primaryBurn.length > 1) {
+    const burnedState = primaryBurn[primaryBurn.length - 1].slice(1);
+    const burnedRes = _newtonPolishND(def, params, burnedState, tol, maxIter, eps);
+    updateBest(burnedRes);
+    if (burnedRes.converged) return burnedRes;
+  }
+
+  // Pass 3: fallback seeds (direct Newton, then RK4 burn-in + Newton)
+  for (let i = 1; i < candidates.length; i++) {
+    const cand = candidates[i];
+    const directRes = _newtonPolishND(def, params, cand, tol, maxIter, eps);
+    updateBest(directRes);
+    if (directRes.converged) return directRes;
+
+    const burn = rk4(def, cand, 0, burnInT, burnInDt, params);
+    if (burn.length > 1) {
+      const burnedState = burn[burn.length - 1].slice(1);
+      const burnedRes = _newtonPolishND(def, params, burnedState, tol, maxIter, eps);
+      updateBest(burnedRes);
+      if (burnedRes.converged) return burnedRes;
+    }
+  }
+
+  return best;
+}
+
+/** Detect non-smooth functions in a custom model_spec that can hinder numerical continuation. */
+export function detectNonSmoothExpressions(model_spec) {
+  if (!model_spec || typeof model_spec !== 'object') return [];
+  const pattern = /\b(step|heaviside|abs|min|max|sign)\s*\(/gi;
+  const found = new Set();
+
+  const scanText = (text) => {
+    if (typeof text !== 'string') return;
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      found.add(`${match[1]}(`);
+    }
+  };
+
+  const scanContainer = (container) => {
+    if (!container || typeof container !== 'object') return;
+    for (const val of Object.values(container)) {
+      if (typeof val === 'string') {
+        scanText(val);
+      } else if (val && typeof val === 'object') {
+        scanText(val.body);
+        scanText(val.expr);
+        scanText(val.expression);
+      }
+    }
+  };
+
+  scanContainer(model_spec.equations);
+  scanContainer(model_spec.functions);
+  scanContainer(model_spec.custom_functions);
+  return [...found];
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  CANVAS RENDERING  (unchanged coordinate helpers & draw calls)
 // ═══════════════════════════════════════════════════════════════
@@ -14859,10 +15066,360 @@ function computeExperimentState(model) {
   }
   return def;
 }
+// Lazy Web Worker manager & 3-host asset resolver for AUTO2000 WASM continuation.
+
+function _toUint8Array(buf) {
+  if (buf instanceof Uint8Array) return buf;
+  if (buf instanceof ArrayBuffer) return new Uint8Array(buf);
+  if (ArrayBuffer.isView(buf)) return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+  return new Uint8Array(buf);
+}
+
+function _decodeBase64ToBytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function _requestAssetsFromKernel(model, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      model.off?.('msg:custom', onCustomMsg);
+      reject(new Error('Timed out waiting for AUTO2000 assets from Jupyter kernel.'));
+    }, timeoutMs);
+
+    const onCustomMsg = (content, buffers) => {
+      if (content?.type !== 'auto_assets') return;
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      model.off?.('msg:custom', onCustomMsg);
+      if (!Array.isArray(buffers) || buffers.length < 2) {
+        reject(new Error('Kernel auto_assets response missing WASM or worker buffer.'));
+        return;
+      }
+      const wasmBytes = _toUint8Array(buffers[0]);
+      const workerBytes = _toUint8Array(buffers[1]);
+      const workerBlob = new Blob([workerBytes], { type: 'application/javascript' });
+      const workerUrl = URL.createObjectURL(workerBlob);
+      resolve({ workerUrl, wasmBytes });
+    };
+
+    model.on('msg:custom', onCustomMsg);
+    model.send({ type: 'request_auto_assets' });
+  });
+}
+
+export async function resolveAutoAssets(model) {
+  const wasmUrl = model?.get?.('auto_wasm_url') || '';
+  const workerUrl = model?.get?.('auto_worker_url') || '';
+
+  // 1. Explicit URL traits (direct HTTP/static hosting)
+  if (wasmUrl || workerUrl) {
+    const base = globalThis.location?.href || 'http://localhost/';
+    const resolvedWorkerUrl = workerUrl
+      ? new URL(workerUrl, base).href
+      : new URL('auto2000-worker.js', new URL(wasmUrl, base)).href;
+    const resolvedWasmUrl = wasmUrl
+      ? new URL(wasmUrl, base).href
+      : new URL('auto2000_core.wasm', new URL(workerUrl, base)).href;
+    return { workerUrl: resolvedWorkerUrl, wasmUrl: resolvedWasmUrl };
+  }
+
+  // 2. Standalone HTML embedded assets
+  const embedded = globalThis.__PPW_AUTO_ASSETS__;
+  if (embedded && embedded.wasmBase64 && embedded.workerSource) {
+    const wasmBytes = _decodeBase64ToBytes(embedded.wasmBase64);
+    const workerBlob = new Blob([embedded.workerSource], { type: 'application/javascript' });
+    const blobUrl = URL.createObjectURL(workerBlob);
+    return { workerUrl: blobUrl, wasmBytes };
+  }
+
+  // 3. JupyterLab / Notebook kernel comm
+  if (model && !model._isMock && typeof model.send === 'function' && typeof model.on === 'function') {
+    return _requestAssetsFromKernel(model);
+  }
+
+  // 4. Lightweight standalone export without embedded assets or URLs
+  throw new Error(
+    'AUTO2000 WASM assets are unavailable (not bundled in this lightweight export and no auto_wasm_url or live kernel comm is present).'
+  );
+}
+
+export function createAutoClient(model) {
+  let worker = null;
+  let readyPromise = null;
+  let assetsPromise = null;
+  let pendingJob = null;
+  let nextJobId = 1;
+  let runEpoch = 0;
+
+  function _clearWorker() {
+    if (worker) {
+      worker.terminate();
+      worker = null;
+    }
+    readyPromise = null;
+  }
+
+  function _rejectPending(err) {
+    if (!pendingJob) return;
+    const job = pendingJob;
+    pendingJob = null;
+    if (job.timer) clearTimeout(job.timer);
+    job.reject(err);
+  }
+
+  async function _ensureWorkerReady() {
+    if (readyPromise) return readyPromise;
+    readyPromise = (async () => {
+      if (!assetsPromise) {
+        assetsPromise = resolveAutoAssets(model).catch((err) => {
+          assetsPromise = null;
+          throw err;
+        });
+      }
+      const assets = await assetsPromise;
+      const w = new Worker(assets.workerUrl);
+      worker = w;
+
+      await new Promise((resolve, reject) => {
+        const onMessage = (event) => {
+          const data = event.data || {};
+          if (data.type === 'ready') {
+            w.removeEventListener('message', onMessage);
+            w.removeEventListener('error', onError);
+            resolve();
+          } else if (data.type === 'error' && data.jobId === undefined) {
+            w.removeEventListener('message', onMessage);
+            w.removeEventListener('error', onError);
+            reject(new Error(data.message || 'AUTO2000 worker initialization failed'));
+          }
+        };
+        const onError = (err) => {
+          w.removeEventListener('message', onMessage);
+          w.removeEventListener('error', onError);
+          reject(new Error(err?.message || 'AUTO2000 worker failed to load'));
+        };
+        w.addEventListener('message', onMessage);
+        w.addEventListener('error', onError);
+        w.postMessage({
+          type: 'init',
+          wasmBytes: assets.wasmBytes,
+          wasmUrl: assets.wasmUrl,
+        });
+      });
+
+      w.addEventListener('message', (event) => {
+        const data = event.data || {};
+        if (!pendingJob || data.jobId !== pendingJob.jobId) return;
+        const job = pendingJob;
+        pendingJob = null;
+        if (job.timer) clearTimeout(job.timer);
+        if (data.type === 'result') {
+          job.resolve({
+            branch: data.branch,
+            specialPoints: data.specialPoints,
+            restartHandles: data.restartHandles,
+            elapsedMs: data.elapsedMs,
+          });
+        } else if (data.type === 'error') {
+          job.reject(new Error(data.message || 'AUTO2000 continuation failed'));
+        }
+      });
+
+      w.addEventListener('error', (err) => {
+        _clearWorker();
+        _rejectPending(new Error(err?.message || 'AUTO2000 worker crashed'));
+      });
+    })().catch((err) => {
+      _clearWorker();
+      throw err;
+    });
+
+    return readyPromise;
+  }
+
+  function cancel() {
+    runEpoch++;
+    _clearWorker();
+    _rejectPending(new Error('AUTO2000 continuation cancelled'));
+  }
+
+  async function run(payload, { timeoutMs = 15000 } = {}) {
+    if (pendingJob) {
+      _rejectPending(new Error('AUTO2000 continuation superseded by a new run'));
+    }
+    const myEpoch = runEpoch;
+    await _ensureWorkerReady();
+    if (myEpoch !== runEpoch || !worker) {
+      throw new Error('AUTO2000 continuation cancelled');
+    }
+    const jobId = nextJobId++;
+    return new Promise((resolve, reject) => {
+      let timer = null;
+      if (timeoutMs > 0) {
+        timer = setTimeout(() => {
+          if (pendingJob && pendingJob.jobId === jobId) {
+            _clearWorker();
+            _rejectPending(new Error(`AUTO2000 continuation timed out after ${timeoutMs}ms`));
+          }
+        }, timeoutMs);
+      }
+      pendingJob = { jobId, resolve, reject, timer };
+      worker.postMessage({ type: 'run', jobId, ...payload });
+    });
+  }
+
+  return { run, cancel };
+}
 // One controller per canonical experiment model, independent of mounted panels.
 const EXPERIMENT_CONTROLLER = Symbol.for('trajecturtle.experiment-controller');
 const COMPUTATION_INPUTS = ['model_spec', 'model_name', 'params', 'state_names', 'display', 'clamped', 'x0', 'y0', 'xlim', 'ylim', 't_max', 'dt', 'integrator', 'noise_enable', 'noise_sigma', 'noise_seed'];
 const PRESENTATION_INPUTS = ['param_info', 'show_nullclines', 'show_vector_field', 'show_trajectory', 'show_fixed_points', 'trajectory_fraction', 'reference_trajectory', 'reference_scene', 'show_reference', 'reference_metadata', 'sweep_results', 'sweep_fixed_points', 'sweep_param', 'initial_conditions', 'observation_cards'];
+const BIFURCATION_INPUTS = ['bifurcation_branches', 'bifurcation_special_points', 'bifurcation_config', 'bifurcation_running', 'bifurcation_metadata', 'bifurcation_presets'];
+
+function _bifurcationModelIdentity(model) {
+  return JSON.stringify([
+    model.get('model_name'),
+    model.get('model_spec') || null,
+    model.get('state_names') || [],
+  ]);
+}
+
+function _bifurcationFixedParamsIdentity(model, activeParams) {
+  const params = model.get('params') || {};
+  const active = new Set(activeParams || []);
+  const entries = Object.keys(params)
+    .filter((k) => !active.has(k))
+    .sort()
+    .map((k) => [k, params[k]]);
+  return JSON.stringify(entries);
+}
+
+function _resolveBifurcationRange(def, model, paramName, explicitRange, rl0, rl1, currentVal) {
+  if (Array.isArray(explicitRange) && explicitRange.length === 2 &&
+      Number.isFinite(explicitRange[0]) && Number.isFinite(explicitRange[1])) {
+    return explicitRange[0] <= explicitRange[1]
+      ? [explicitRange[0], explicitRange[1]]
+      : [explicitRange[1], explicitRange[0]];
+  }
+  if (Number.isFinite(rl0) && Number.isFinite(rl1)) {
+    return rl0 <= rl1 ? [rl0, rl1] : [rl1, rl0];
+  }
+  const info = def.paramInfo?.[paramName] ?? model.get('param_info')?.[paramName];
+  if (Array.isArray(info) && info.length >= 2 && Number.isFinite(info[0]) && Number.isFinite(info[1])) {
+    return info[0] <= info[1] ? [info[0], info[1]] : [info[1], info[0]];
+  }
+  const v = Number.isFinite(currentVal) ? currentVal : 0;
+  return [v - 1, v + 1];
+}
+
+function _buildSeedCandidates(def, model) {
+  const dim = def.dim || (model.get('state_names') || []).length || 2;
+  const display = model.get('display') || def.display || [0, 1];
+  const clamped = model.get('clamped') || [];
+  const base = Array.from({ length: dim }, (_, i) => {
+    if (Number.isFinite(clamped[i])) return clamped[i];
+    const lim = def.defaultLims?.[i];
+    return Array.isArray(lim) && lim.length === 2 ? (lim[0] + lim[1]) / 2 : 0;
+  });
+
+  const primary = [...base];
+  const x0 = model.get('x0');
+  const y0 = model.get('y0');
+  if (Number.isFinite(x0) && display[0] < dim) primary[display[0]] = x0;
+  if (display.length > 1 && Number.isFinite(y0) && display[1] < dim) primary[display[1]] = y0;
+
+  const fallbacks = [];
+  const traj = model.get('trajectory') || [];
+  if (traj.length > 0 && Array.isArray(traj[traj.length - 1]) && traj[traj.length - 1].length >= dim + 1) {
+    fallbacks.push(traj[traj.length - 1].slice(1, 1 + dim));
+  }
+  const fps = model.get('fixed_points') || [];
+  for (const fp of fps) {
+    if (!Array.isArray(fp) || fp.length < 2) continue;
+    const fb = [...base];
+    if (display[0] < dim) fb[display[0]] = fp[0];
+    if (display.length > 1 && display[1] < dim) fb[display[1]] = fp[1];
+    fallbacks.push(fb);
+  }
+  return { primary, fallbacks };
+}
+
+function _stitchBidirectionalBranch(backwardPts, forwardPts) {
+  const back = [...(backwardPts || [])].reverse();
+  const fwd = [...(forwardPts || [])];
+  if (back.length > 0 && fwd.length > 0) {
+    const last = back[back.length - 1];
+    const first = fwd[0];
+    const sameP = Math.abs((last.p ?? 0) - (first.p ?? 0)) < 1e-8 &&
+      Math.abs((last.p2 ?? 0) - (first.p2 ?? 0)) < 1e-8;
+    const uA = last.u || [];
+    const uB = first.u || [];
+    const sameU = uA.length === uB.length && uA.every((v, i) => Math.abs(v - uB[i]) < 1e-6);
+    if (sameP && sameU) fwd.shift();
+  }
+  return [...back, ...fwd];
+}
+
+function _nextBranchId(prefix, existingBranches) {
+  let maxNum = 0;
+  const re = new RegExp(`^${prefix}_(\\d+)$`);
+  for (const br of existingBranches || []) {
+    const m = re.exec(br?.id || '');
+    if (m) maxNum = Math.max(maxNum, Number(m[1]));
+  }
+  return `${prefix}_${maxNum + 1}`;
+}
+
+function _registerSpecialPoints(rawSpecialPoints, branchId, param1, param2, existingSps, restartCache) {
+  const counts = {};
+  for (const sp of existingSps || []) {
+    if (sp?.ty) counts[sp.ty] = (counts[sp.ty] || 0) + 1;
+  }
+  const added = [];
+  for (const sp of rawSpecialPoints || []) {
+    if (!sp || !sp.ty || sp.ty === 'EP' || sp.ty === 'UZ') continue;
+    counts[sp.ty] = (counts[sp.ty] || 0) + 1;
+    const id = `${sp.ty}${counts[sp.ty]}`;
+    const entry = {
+      id,
+      label: id,
+      ty: sp.ty,
+      lab: sp.lab,
+      p: sp.p,
+      u: Array.isArray(sp.u) ? [...sp.u] : [],
+      branch_id: branchId,
+      param1,
+      param2: param2 ?? null,
+      can_switch_lc: sp.ty === 'HB',
+      can_trace_2d: sp.ty === 'LP' || sp.ty === 'HB',
+      ...(sp.period !== undefined ? { period: sp.period } : {}),
+      ...(sp.p2 !== undefined ? { p2: sp.p2 } : {}),
+    };
+    added.push(entry);
+    restartCache.set(id, {
+      ...(sp.restartSp || {}),
+      ty: sp.ty,
+      lab: sp.lab,
+      p: sp.p,
+      p2: sp.p2,
+      u: entry.u,
+      param1,
+      param2: param2 ?? null,
+      branch_id: branchId,
+      restartSp: sp.restartSp || null,
+    });
+  }
+  return added;
+}
 
 export function acquireExperiment(model) {
   const controller = model[EXPERIMENT_CONTROLLER] ||= createExperimentController(model);
@@ -14875,8 +15432,37 @@ function createExperimentController(model) {
   const listeners = [];
   let references = 0, pending = null, computing = false, disposed = false;
   let sweepJob = null, playback = null;
+  let autoClient = null, bifurcationJob = null, bifurcationGeneration = 0;
+  function _getAutoClient() {
+    if (!autoClient) autoClient = createAutoClient(model);
+    return autoClient;
+  }
+  function _isBifurcationJobActive(job) {
+    return !disposed && job && !job.cancelled && bifurcationJob === job && bifurcationGeneration === job.id;
+  }
+  function _beginBifurcationJob(owner, modelIdentity) {
+    if (bifurcationJob) controller.cancelBifurcation();
+    bifurcationGeneration++;
+    const job = { id: bifurcationGeneration, owner, modelIdentity, cancelled: false };
+    bifurcationJob = job;
+    model.set('bifurcation_running', true);
+    const meta = model.get('bifurcation_metadata') || {};
+    model.set('bifurcation_metadata', { ...meta, status: 'running', error: null });
+    emit(); sync();
+    return job;
+  }
+  function _failBifurcationJob(job, message) {
+    if (!_isBifurcationJobActive(job)) return null;
+    bifurcationJob = null;
+    model.set('bifurcation_running', false);
+    const meta = model.get('bifurcation_metadata') || {};
+    model.set('bifurcation_metadata', { ...meta, status: 'error', error: message });
+    emit(); sync();
+    return null;
+  }
   const controller = {
     model, error: null, sweep: { progress: 0, status: '' },
+    restartCache: new Map(),
     get playing() { return !!playback; },
     retain() { references++; },
     subscribe(callback) { subscribers.add(callback); return () => subscribers.delete(callback); },
@@ -14884,6 +15470,7 @@ function createExperimentController(model) {
       if (--references > 0) return;
       clearTimeout(pending);
       controller.cancelSweep();
+      controller.cancelBifurcation();
       controller.pause();
       disposed = true;
       for (const [event, callback] of listeners) model.off(event, callback);
@@ -14910,10 +15497,28 @@ function createExperimentController(model) {
           model.set('sweep_metadata', {});
           controller.sweep.status = 'Configuration changed — run sweep again';
         }
+        const modelIdentity = _bifurcationModelIdentity(model);
+        const bifMeta = model.get('bifurcation_metadata') || {};
+        const bifBranches = model.get('bifurcation_branches') || [];
+        if (bifurcationJob && bifurcationJob.modelIdentity !== modelIdentity) {
+          controller.clearBifurcation();
+        } else if (bifBranches.length > 0) {
+          if (bifMeta.model_identity && bifMeta.model_identity !== modelIdentity) {
+            controller.clearBifurcation();
+          } else if (bifMeta.fixed_params_identity) {
+            const fixedId = _bifurcationFixedParamsIdentity(model, bifMeta.active_params);
+            if (fixedId !== bifMeta.fixed_params_identity) {
+              if (!bifMeta.stale) model.set('bifurcation_metadata', { ...bifMeta, stale: true });
+            } else if (bifMeta.stale) {
+              model.set('bifurcation_metadata', { ...bifMeta, stale: false });
+            }
+          }
+        }
       } catch (error) {
         controller.definition = null;
         controller.error = error;
         controller.cancelSweep();
+        controller.cancelBifurcation();
         model.set('sweep_results', []); model.set('sweep_fixed_points', []);
       } finally {
         computing = false;
@@ -14921,7 +15526,7 @@ function createExperimentController(model) {
       emit(); sync();
     },
     reset() {
-      controller.pause(); controller.cancelSweep();
+      controller.pause(); controller.cancelSweep(); controller.cancelBifurcation();
       controller.sweep = { progress: 0, status: '' };
       resetExperiment(model);
       controller.refresh();
@@ -15040,6 +15645,351 @@ function createExperimentController(model) {
         step();
       } catch (error) { fail(error); }
     },
+    cancelBifurcation(owner = null) {
+      if (!bifurcationJob || (owner && bifurcationJob.owner !== owner)) return;
+      bifurcationGeneration++;
+      bifurcationJob.cancelled = true;
+      bifurcationJob = null;
+      autoClient?.cancel();
+      model.set('bifurcation_running', false);
+      const meta = model.get('bifurcation_metadata') || {};
+      model.set('bifurcation_metadata', { ...meta, status: 'cancelled' });
+      emit(); sync();
+    },
+    clearBifurcation() {
+      if (bifurcationJob) controller.cancelBifurcation();
+      controller.restartCache.clear();
+      model.set('bifurcation_branches', []);
+      model.set('bifurcation_special_points', []);
+      model.set('bifurcation_running', false);
+      model.set('bifurcation_metadata', {});
+      emit(); sync();
+    },
+    async startEquilibriumContinuation(config = {}, owner = null) {
+      const modelName = model.get('model_name');
+      const modelSpec = model.get('model_spec');
+      const modelIdentity = _bifurcationModelIdentity(model);
+      const job = _beginBifurcationJob(owner, modelIdentity);
+      try {
+        const def = resolveModel(modelName, modelSpec);
+        const params = { ...(def.defaultParams || {}), ...(model.get('params') || {}) };
+        const cfg = { ...(model.get('bifurcation_config') || {}), ...config };
+        const param1 = cfg.param1 || cfg.parameter || Object.keys(def.defaultParams || {})[0];
+        if (!param1) {
+          return _failBifurcationJob(job, 'No continuation parameter available for this model');
+        }
+        const [rl0, rl1] = _resolveBifurcationRange(def, model, param1, cfg.range, cfg.rl0, cfg.rl1, params[param1]);
+        const { primary, fallbacks } = _buildSeedCandidates(def, model);
+        const seed = findSteadyStateND(def, params, primary, { fallbackStates: fallbacks });
+        if (!seed.converged) {
+          return _failBifurcationJob(
+            job,
+            `Failed to locate a steady state for continuation (residual ${seed.residual.toExponential(2)})`,
+          );
+        }
+
+        const nonSmoothTokens = modelName === 'custom' ? detectNonSmoothExpressions(modelSpec) : [];
+        const absDs = Math.abs(cfg.ds ?? 0.05) || 0.05;
+        const p0Val = Number(params[param1] ?? 0);
+        const contBase = {
+          ips: 1,
+          isw: 1,
+          activeParams: [param1],
+          rl0,
+          rl1,
+          dsmin: cfg.dsmin ?? 1e-4,
+          dsmax: cfg.dsmax ?? 0.2,
+          nmx: cfg.nmx ?? 200,
+          npr: cfg.npr ?? 200,
+          ilp: cfg.ilp ?? 1,
+          isp: cfg.isp ?? 2,
+          stpnt: { u: seed.u, par: [p0Val] },
+        };
+        const modelPayload = { model_name: modelName, model_spec: modelSpec, params };
+        const client = _getAutoClient();
+
+        const fwdRes = await client.run({
+          model: modelPayload,
+          continuation: { ...contBase, ds: absDs },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const bwdRes = await client.run({
+          model: modelPayload,
+          continuation: { ...contBase, ds: -absDs },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const existingBranches = model.get('bifurcation_branches') || [];
+        const existingSps = model.get('bifurcation_special_points') || [];
+        const branchId = _nextBranchId('ep', existingBranches);
+        const stitchedPoints = _stitchBidirectionalBranch(bwdRes.branch, fwdRes.branch);
+        const branch = {
+          id: branchId,
+          type: 'EP',
+          param1,
+          param2: null,
+          points: stitchedPoints,
+        };
+
+        const rawSps = [...(bwdRes.specialPoints || []), ...(fwdRes.specialPoints || [])];
+        const addedSps = _registerSpecialPoints(rawSps, branchId, param1, null, existingSps, controller.restartCache);
+
+        const prevMeta = model.get('bifurcation_metadata') || {};
+        const activeParams = [...new Set([...(prevMeta.active_params || []), param1])];
+        model.set('bifurcation_branches', [...existingBranches, branch]);
+        model.set('bifurcation_special_points', [...existingSps, ...addedSps]);
+        model.set('bifurcation_metadata', {
+          model_identity: modelIdentity,
+          active_params: activeParams,
+          fixed_params_identity: _bifurcationFixedParamsIdentity(model, activeParams),
+          stale: false,
+          status: 'complete',
+          error: null,
+          seed: seed.u,
+          ...(nonSmoothTokens.length > 0 ? { non_smooth_tokens: nonSmoothTokens } : {}),
+        });
+        bifurcationJob = null;
+        model.set('bifurcation_running', false);
+        emit(); sync();
+        return { branch, specialPoints: addedSps };
+      } catch (error) {
+        return _failBifurcationJob(job, error?.message || String(error));
+      }
+    },
+    async switchToLimitCycle(specialPointId, config = {}, owner = null) {
+      const entry = controller.restartCache.get(specialPointId);
+      const modelIdentity = _bifurcationModelIdentity(model);
+      const job = _beginBifurcationJob(owner, modelIdentity);
+      try {
+        if (!entry || entry.ty !== 'HB') {
+          return _failBifurcationJob(job, `Limit-cycle switching requires a Hopf (HB) point (got ${entry?.ty || 'none'})`);
+        }
+        const modelName = model.get('model_name');
+        const modelSpec = model.get('model_spec');
+        const def = resolveModel(modelName, modelSpec);
+        const params = { ...(def.defaultParams || {}), ...(model.get('params') || {}) };
+        const cfg = { ...(model.get('bifurcation_config') || {}), ...config };
+        const param1 = entry.param1 || cfg.param1 || Object.keys(def.defaultParams || {})[0];
+        const [rl0, rl1] = _resolveBifurcationRange(def, model, param1, cfg.range, cfg.rl0, cfg.rl1, params[param1]);
+
+        const client = _getAutoClient();
+        const res = await client.run({
+          model: { model_name: modelName, model_spec: modelSpec, params },
+          continuation: {
+            ips: 2,
+            isw: 1,
+            irs: entry.lab,
+            restartSp: entry.restartSp || entry,
+            activeParams: [param1],
+            rl0,
+            rl1,
+            ds: cfg.ds ?? 0.05,
+            dsmin: cfg.dsmin ?? 1e-4,
+            dsmax: cfg.dsmax ?? 0.2,
+            nmx: cfg.nmx ?? 200,
+            npr: cfg.npr ?? 200,
+            ntst: cfg.ntst ?? 50,
+            ncol: cfg.ncol ?? 4,
+            ilp: cfg.ilp ?? 1,
+            isp: cfg.isp ?? 2,
+          },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const existingBranches = model.get('bifurcation_branches') || [];
+        const existingSps = model.get('bifurcation_special_points') || [];
+        const branchId = _nextBranchId('lc', existingBranches);
+        const branch = {
+          id: branchId,
+          type: 'LC',
+          param1,
+          param2: null,
+          source_sp_id: specialPointId,
+          points: res.branch || [],
+        };
+        const addedSps = _registerSpecialPoints(res.specialPoints || [], branchId, param1, null, existingSps, controller.restartCache);
+
+        const prevMeta = model.get('bifurcation_metadata') || {};
+        const activeParams = [...new Set([...(prevMeta.active_params || []), param1])];
+        model.set('bifurcation_branches', [...existingBranches, branch]);
+        model.set('bifurcation_special_points', [...existingSps, ...addedSps]);
+        model.set('bifurcation_metadata', {
+          ...prevMeta,
+          model_identity: modelIdentity,
+          active_params: activeParams,
+          fixed_params_identity: _bifurcationFixedParamsIdentity(model, activeParams),
+          stale: false,
+          status: 'complete',
+          error: null,
+        });
+        bifurcationJob = null;
+        model.set('bifurcation_running', false);
+        emit(); sync();
+        return { branch, specialPoints: addedSps };
+      } catch (error) {
+        return _failBifurcationJob(job, error?.message || String(error));
+      }
+    },
+    async startTwoParamContinuation(specialPointId, param2, config = {}, owner = null) {
+      const entry = controller.restartCache.get(specialPointId);
+      const modelIdentity = _bifurcationModelIdentity(model);
+      const job = _beginBifurcationJob(owner, modelIdentity);
+      try {
+        if (!entry || (entry.ty !== 'LP' && entry.ty !== 'HB')) {
+          return _failBifurcationJob(job, `Two-parameter continuation requires an LP or HB point (got ${entry?.ty || 'none'})`);
+        }
+        const modelName = model.get('model_name');
+        const modelSpec = model.get('model_spec');
+        const def = resolveModel(modelName, modelSpec);
+        const params = { ...(def.defaultParams || {}), ...(model.get('params') || {}) };
+        const cfg = { ...(model.get('bifurcation_config') || {}), ...config };
+        const param1 = entry.param1 || cfg.param1 || Object.keys(def.defaultParams || {})[0];
+        if (!param2 || param2 === param1) {
+          return _failBifurcationJob(job, 'Choose a second parameter distinct from the primary parameter');
+        }
+        const [rl0, rl1] = _resolveBifurcationRange(def, model, param1, cfg.range, cfg.rl0, cfg.rl1, params[param1]);
+        const absDs = Math.abs(cfg.ds ?? 0.05) || 0.05;
+        const contBase = {
+          ips: 1,
+          isw: 2,
+          irs: entry.lab,
+          restartSp: entry.restartSp || entry,
+          activeParams: [param1, param2],
+          rl0,
+          rl1,
+          dsmin: cfg.dsmin ?? 1e-4,
+          dsmax: cfg.dsmax ?? 0.2,
+          nmx: cfg.nmx ?? 200,
+          npr: cfg.npr ?? 200,
+          ilp: cfg.ilp ?? 1,
+          isp: cfg.isp ?? 2,
+        };
+        const modelPayload = { model_name: modelName, model_spec: modelSpec, params };
+        const client = _getAutoClient();
+
+        const fwdRes = await client.run({
+          model: modelPayload,
+          continuation: { ...contBase, ds: absDs },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const bwdRes = await client.run({
+          model: modelPayload,
+          continuation: { ...contBase, ds: -absDs },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const existingBranches = model.get('bifurcation_branches') || [];
+        const existingSps = model.get('bifurcation_special_points') || [];
+        const branchType = entry.ty === 'LP' ? 'LP2' : 'HB2';
+        const branchId = _nextBranchId(branchType.toLowerCase(), existingBranches);
+        const stitchedPoints = _stitchBidirectionalBranch(bwdRes.branch, fwdRes.branch);
+        const branch = {
+          id: branchId,
+          type: branchType,
+          param1,
+          param2,
+          source_sp_id: specialPointId,
+          points: stitchedPoints,
+        };
+        const rawSps = [...(bwdRes.specialPoints || []), ...(fwdRes.specialPoints || [])];
+        const addedSps = _registerSpecialPoints(rawSps, branchId, param1, param2, existingSps, controller.restartCache);
+
+        const prevMeta = model.get('bifurcation_metadata') || {};
+        const activeParams = [...new Set([...(prevMeta.active_params || []), param1, param2])];
+        model.set('bifurcation_branches', [...existingBranches, branch]);
+        model.set('bifurcation_special_points', [...existingSps, ...addedSps]);
+        model.set('bifurcation_metadata', {
+          ...prevMeta,
+          model_identity: modelIdentity,
+          active_params: activeParams,
+          fixed_params_identity: _bifurcationFixedParamsIdentity(model, activeParams),
+          stale: false,
+          status: 'complete',
+          error: null,
+        });
+        bifurcationJob = null;
+        model.set('bifurcation_running', false);
+        emit(); sync();
+        return { branch, specialPoints: addedSps };
+      } catch (error) {
+        return _failBifurcationJob(job, error?.message || String(error));
+      }
+    },
+    async runBifurcationPreset(presetIndex, owner = null) {
+      const presets = model.get('bifurcation_presets') || [];
+      const preset = presets[presetIndex];
+      if (!preset) return null;
+
+      const prevCfg = model.get('bifurcation_config') || {};
+      model.set('bifurcation_config', {
+        ...prevCfg,
+        param1: preset.param1,
+        ...(preset.range ? { range: preset.range } : {}),
+        ...(preset.param2 ? { param2: preset.param2 } : {}),
+        ...(preset.range2 ? { range2: preset.range2 } : {}),
+      });
+      emit(); sync();
+
+      const epRes = await controller.startEquilibriumContinuation(
+        { param1: preset.param1, range: preset.range },
+        owner,
+      );
+      if (!epRes || disposed) return null;
+
+      let lcRes = null;
+      if (preset.auto_switch_lc) {
+        const hb = (epRes.specialPoints || []).find((sp) => sp.ty === 'HB');
+        if (hb) {
+          lcRes = await controller.switchToLimitCycle(
+            hb.id,
+            { param1: preset.param1, range: preset.range },
+            owner,
+          );
+          if (!lcRes || disposed) return { ep: epRes, lc: lcRes, twoParam: null };
+        }
+      }
+
+      let twoParamRes = null;
+      if (preset.auto_trace_2d && preset.param2) {
+        const sp2d = (epRes.specialPoints || []).find((sp) => sp.ty === 'LP' || sp.ty === 'HB');
+        if (sp2d) {
+          twoParamRes = await controller.startTwoParamContinuation(
+            sp2d.id,
+            preset.param2,
+            { range: preset.range, range2: preset.range2 },
+            owner,
+          );
+        }
+      }
+      return { ep: epRes, lc: lcRes, twoParam: twoParamRes };
+    },
+    jumpToBifurcationPoint(point, branch, opts = {}) {
+      if (!point) return;
+      const meta = model.get('bifurcation_metadata') || {};
+      const p1 = branch?.param1 || point.param1 || meta.active_params?.[0];
+      const p2 = branch?.param2 || point.param2 || null;
+      const nextParams = { ...(model.get('params') || {}) };
+      if (p1 && Number.isFinite(point.p)) nextParams[p1] = point.p;
+      if (p2 && Number.isFinite(point.p2)) nextParams[p2] = point.p2;
+
+      const updates = { params: nextParams };
+      const isEp = !branch || branch.type === 'EP';
+      const display = model.get('display') || [0, 1];
+      if (isEp && Array.isArray(point.u) && point.u.length > 2) {
+        const prevClamped = model.get('clamped') || [];
+        const nextClamped = point.u.map((val, i) => (
+          display.includes(i) ? (prevClamped[i] ?? val) : val
+        ));
+        updates.clamped = nextClamped;
+      }
+      if ((opts.updateInitialCondition || opts.setInitialCondition) && Array.isArray(point.u)) {
+        if (Number.isFinite(point.u[display[0]])) updates.x0 = point.u[display[0]];
+        if (display.length > 1 && Number.isFinite(point.u[display[1]])) updates.y0 = point.u[display[1]];
+      }
+      controller.commit(updates);
+    },
   };
   function sync() { if (!disposed) model.save_changes?.(); }
   function emit() { if (!disposed && !computing) for (const callback of [...subscribers]) callback(); }
@@ -15050,6 +16000,7 @@ function createExperimentController(model) {
   }
   for (const key of COMPUTATION_INPUTS) listen(key, schedule);
   for (const key of PRESENTATION_INPUTS) listen(key, emit);
+  for (const key of BIFURCATION_INPUTS) listen(key, emit);
   controller.refresh();
   return controller;
 }
@@ -15478,6 +16429,299 @@ function drawSweep(model, sweepCtx, w, h, _results = model.get('sweep_results'),
     }
   }
 }
+
+function bifurcationObservableValue(pt, obsKey, which = 'u') {
+  if (!pt) return NaN;
+  const vec = which === 'u_max' ? (pt.u_max || pt.u) : which === 'u_min' ? (pt.u_min || pt.u) : pt.u;
+  if (!Array.isArray(vec) || vec.length === 0) return NaN;
+  if (obsKey === 'L2' || obsKey === 'l2') {
+    let sq = 0;
+    for (let i = 0; i < vec.length; i++) sq += vec[i] * vec[i];
+    return Math.sqrt(sq);
+  }
+  const idx = Number.isInteger(obsKey) ? obsKey : 0;
+  return Number(vec[idx] ?? vec[0]);
+}
+
+function _resolveBifurcationObs(model) {
+  const cfg = model.get('bifurcation_config') || {};
+  const stateNames = model.get('state_names') || [];
+  const raw = cfg.observable;
+  if (raw === 'L2' || raw === 'l2') return { obsKey: 'L2', obsLabel: 'L2 norm' };
+  if (typeof raw === 'string' && stateNames.includes(raw)) {
+    const idx = stateNames.indexOf(raw);
+    return { obsKey: idx, obsLabel: stateNames[idx] || 'u' + idx };
+  }
+  const parsed = Number.isInteger(raw) ? raw : (raw !== undefined && raw !== '' && Number.isFinite(Number(raw)) ? Math.trunc(Number(raw)) : 0);
+  const idx = Math.max(0, Math.min(Math.max(0, stateNames.length - 1), parsed));
+  return { obsKey: idx, obsLabel: stateNames[idx] || ('u' + idx) };
+}
+
+function _padBounds(min, max, frac = 0.05) {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [-1, 1];
+  if (min === max) return [min - 0.5, max + 0.5];
+  const margin = (max - min) * frac;
+  return [min - margin, max + margin];
+}
+
+function bifurcation1DBounds(model) {
+  const cfg = model.get('bifurcation_config') || {};
+  const branches = (model.get('bifurcation_branches') || []).filter(b => b && (b.type === 'EP' || b.type === 'LC'));
+  const sps = (model.get('bifurcation_special_points') || []).filter(sp => sp && sp.ty !== 'CP' && sp.ty !== 'BT' && sp.ty !== 'GH' && !sp.param2);
+  const meta = model.get('bifurcation_metadata') || {};
+  const param1 = cfg.param1 || branches[0]?.param1 || meta.active_params?.[0] || Object.keys(model.get('params') || {})[0] || 'p';
+  const { obsKey, obsLabel } = _resolveBifurcationObs(model);
+  let pMin = Infinity, pMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  const includeY = (v) => { if (Number.isFinite(v)) { yMin = Math.min(yMin, v); yMax = Math.max(yMax, v); } };
+  const includeP = (v) => { if (Number.isFinite(v)) { pMin = Math.min(pMin, v); pMax = Math.max(pMax, v); } };
+  for (const br of branches) {
+    for (const pt of br.points || []) {
+      includeP(pt.p);
+      if (br.type === 'LC') {
+        includeY(bifurcationObservableValue(pt, obsKey, 'u_max'));
+        includeY(bifurcationObservableValue(pt, obsKey, 'u_min'));
+      } else {
+        includeY(bifurcationObservableValue(pt, obsKey, 'u'));
+      }
+    }
+  }
+  for (const sp of sps) {
+    includeP(sp.p);
+    includeY(bifurcationObservableValue(sp, obsKey, 'u'));
+  }
+  return {
+    xlim: _padBounds(pMin, pMax, 0.05),
+    ylim: _padBounds(yMin, yMax, 0.1),
+    param1, obsKey, obsLabel, branches, specialPoints: sps,
+  };
+}
+
+function bifurcation2DBounds(model) {
+  const cfg = model.get('bifurcation_config') || {};
+  const branches = (model.get('bifurcation_branches') || []).filter(b => b && (b.type === 'LP2' || b.type === 'HB2'));
+  const branchIds = new Set(branches.map(b => b.id));
+  const sps = (model.get('bifurcation_special_points') || []).filter(sp => sp && (branchIds.has(sp.branch_id) || Number.isFinite(sp.p2) || sp.ty === 'CP' || sp.ty === 'BT' || sp.ty === 'GH'));
+  const paramNames = Object.keys(model.get('params') || {});
+  const param1 = branches[0]?.param1 || cfg.param1 || paramNames[0] || 'p1';
+  const param2 = branches[0]?.param2 || cfg.param2 || paramNames.find(k => k !== param1) || 'p2';
+  let p1Min = Infinity, p1Max = -Infinity, p2Min = Infinity, p2Max = -Infinity;
+  for (const br of branches) {
+    for (const pt of br.points || []) {
+      if (Number.isFinite(pt.p)) { p1Min = Math.min(p1Min, pt.p); p1Max = Math.max(p1Max, pt.p); }
+      if (Number.isFinite(pt.p2)) { p2Min = Math.min(p2Min, pt.p2); p2Max = Math.max(p2Max, pt.p2); }
+    }
+  }
+  for (const sp of sps) {
+    if (Number.isFinite(sp.p)) { p1Min = Math.min(p1Min, sp.p); p1Max = Math.max(p1Max, sp.p); }
+    if (Number.isFinite(sp.p2)) { p2Min = Math.min(p2Min, sp.p2); p2Max = Math.max(p2Max, sp.p2); }
+  }
+  return {
+    xlim: _padBounds(p1Min, p1Max, 0.05),
+    ylim: _padBounds(p2Min, p2Max, 0.05),
+    param1, param2, branches, specialPoints: sps,
+  };
+}
+
+function _drawBifurcationEmpty(ctx, w, h, theme, message) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = theme.background || theme.bg || DEFAULT_PLOT_THEME.background;
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = theme.muted || DEFAULT_PLOT_THEME.muted;
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(message, w / 2, h / 2);
+}
+
+function _drawStyledCurve(ctx, points, xlim, ylim, w, h, getXY, getStyle) {
+  let activeStyle = null, prevScreen = null;
+  const flush = () => {
+    if (!activeStyle) return;
+    ctx.strokeStyle = activeStyle.strokeStyle;
+    ctx.lineWidth = activeStyle.lineWidth;
+    ctx.setLineDash(activeStyle.dash);
+    ctx.stroke();
+    activeStyle = null;
+  };
+  for (const pt of points || []) {
+    const [wx, wy] = getXY(pt);
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) {
+      flush();
+      prevScreen = null;
+      continue;
+    }
+    const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
+    const style = getStyle(pt);
+    if (!activeStyle || activeStyle.key !== style.key) {
+      flush();
+      activeStyle = style;
+      ctx.beginPath();
+      if (prevScreen) {
+        ctx.moveTo(prevScreen[0], prevScreen[1]);
+        ctx.lineTo(sx, sy);
+      } else {
+        ctx.moveTo(sx, sy);
+      }
+    } else {
+      ctx.lineTo(sx, sy);
+    }
+    prevScreen = [sx, sy];
+  }
+  flush();
+  ctx.setLineDash([]);
+}
+
+function _drawSpecialPointMarker(ctx, sx, sy, sp, theme) {
+  const ty = sp.ty || '';
+  const r = 5;
+  ctx.save();
+  ctx.lineWidth = 1.5;
+  if (ty === 'HB' || ty === 'GH') {
+    ctx.fillStyle = ty === 'HB' ? '#c62828' : '#00838f';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r, sy); ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r, sy);
+    ctx.closePath(); ctx.fill();
+  } else if (ty === 'LP' || ty === 'BT') {
+    ctx.fillStyle = ty === 'LP' ? '#245c9b' : '#d84315';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r, sy + r); ctx.lineTo(sx - r, sy + r);
+    ctx.closePath(); ctx.fill();
+  } else if (ty === 'LPC') {
+    ctx.fillStyle = '#2e7d32';
+    ctx.fillRect(sx - r + 1, sy - r + 1, 2 * r - 2, 2 * r - 2);
+  } else if (ty === 'PD') {
+    ctx.strokeStyle = '#e65100';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r, sy); ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r, sy);
+    ctx.closePath(); ctx.stroke();
+  } else if (ty === 'BP' || ty === 'CP') {
+    ctx.strokeStyle = '#6a1b9a';
+    ctx.beginPath(); ctx.arc(sx, sy, r - 0.5, 0, 2 * Math.PI); ctx.stroke();
+  } else {
+    ctx.fillStyle = theme.text || DEFAULT_PLOT_THEME.text;
+    ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 2 * Math.PI); ctx.fill();
+  }
+  const label = sp.label || sp.id || ty;
+  if (label) {
+    ctx.fillStyle = theme.text || DEFAULT_PLOT_THEME.text;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(label, sx + 6, sy - 4);
+  }
+  ctx.restore();
+}
+
+export function drawBifurcation1D(model, ctx, w, h, theme = DEFAULT_PLOT_THEME) {
+  const allBranches = model.get('bifurcation_branches') || [];
+  if (allBranches.length === 0) {
+    _drawBifurcationEmpty(ctx, w, h, theme, 'Run continuation to trace equilibria and limit cycles');
+    return;
+  }
+  const { xlim, ylim, param1, obsKey, obsLabel, branches, specialPoints } = bifurcation1DBounds(model);
+  if (branches.length === 0) {
+    _drawBifurcationEmpty(ctx, w, h, theme, 'Switch to 2D view to inspect 2-parameter curves');
+    return;
+  }
+  const bg = theme.background || theme.bg || DEFAULT_PLOT_THEME.background;
+  const accent = theme.accent || theme.cursor || '#245c9b';
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  drawAxes(ctx, w, h, xlim, ylim, param1, obsLabel, theme);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(42, 42, w - 84, h - 84);
+  ctx.clip();
+
+  const epStyle = (pt) => pt.stable === true
+    ? { key: 'ep-s', strokeStyle: accent, dash: [], lineWidth: 2 }
+    : { key: 'ep-u', strokeStyle: '#7f8c9a', dash: [6, 4], lineWidth: 1.75 };
+  const lcStyle = (pt) => pt.stable === true
+    ? { key: 'lc-s', strokeStyle: '#2e7d32', dash: [], lineWidth: 2.5 }
+    : { key: 'lc-u', strokeStyle: '#e65100', dash: [3, 3], lineWidth: 2 };
+
+  for (const br of branches) {
+    if (br.type === 'EP') {
+      _drawStyledCurve(ctx, br.points, xlim, ylim, w, h,
+        pt => [pt.p, bifurcationObservableValue(pt, obsKey, 'u')], epStyle);
+    } else if (br.type === 'LC') {
+      _drawStyledCurve(ctx, br.points, xlim, ylim, w, h,
+        pt => [pt.p, bifurcationObservableValue(pt, obsKey, 'u_max')], lcStyle);
+      _drawStyledCurve(ctx, br.points, xlim, ylim, w, h,
+        pt => [pt.p, bifurcationObservableValue(pt, obsKey, 'u_min')], lcStyle);
+    }
+  }
+
+  for (const sp of specialPoints) {
+    const wy = bifurcationObservableValue(sp, obsKey, 'u');
+    if (!Number.isFinite(sp.p) || !Number.isFinite(wy)) continue;
+    const [sx, sy] = worldToScreen(sp.p, wy, xlim, ylim, w, h);
+    _drawSpecialPointMarker(ctx, sx, sy, sp, theme);
+  }
+
+  const currentP = Number(model.get('params')?.[param1]);
+  if (Number.isFinite(currentP) && currentP >= xlim[0] && currentP <= xlim[1]) {
+    const [sx] = worldToScreen(currentP, ylim[0], xlim, ylim, w, h);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = theme.cursor || accent;
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.moveTo(sx, 42);
+    ctx.lineTo(sx, h - 42);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+export function drawBifurcation2D(model, ctx, w, h, theme = DEFAULT_PLOT_THEME) {
+  const { xlim, ylim, param1, param2, branches, specialPoints } = bifurcation2DBounds(model);
+  if (branches.length === 0) {
+    _drawBifurcationEmpty(ctx, w, h, theme, 'No 2D continuation curves yet');
+    return;
+  }
+  const bg = theme.background || theme.bg || DEFAULT_PLOT_THEME.background;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  drawAxes(ctx, w, h, xlim, ylim, param1, param2, theme);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(42, 42, w - 84, h - 84);
+  ctx.clip();
+
+  for (const br of branches) {
+    const color = br.type === 'HB2' ? '#c62828' : '#245c9b';
+    _drawStyledCurve(ctx, br.points, xlim, ylim, w, h,
+      pt => [pt.p, pt.p2], () => ({ key: br.type, strokeStyle: color, dash: [], lineWidth: 2 }));
+  }
+
+  for (const sp of specialPoints) {
+    if (!Number.isFinite(sp.p) || !Number.isFinite(sp.p2)) continue;
+    const [sx, sy] = worldToScreen(sp.p, sp.p2, xlim, ylim, w, h);
+    _drawSpecialPointMarker(ctx, sx, sy, sp, theme);
+  }
+
+  const params = model.get('params') || {};
+  const curP1 = Number(params[param1]), curP2 = Number(params[param2]);
+  if (Number.isFinite(curP1) && Number.isFinite(curP2)) {
+    const [sx, sy] = worldToScreen(curP1, curP2, xlim, ylim, w, h);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = theme.cursor || theme.accent || '#172d46';
+    ctx.lineWidth = 1.25;
+    if (curP1 >= xlim[0] && curP1 <= xlim[1]) {
+      ctx.beginPath(); ctx.moveTo(sx, 42); ctx.lineTo(sx, h - 42); ctx.stroke();
+    }
+    if (curP2 >= ylim[0] && curP2 <= ylim[1]) {
+      ctx.beginPath(); ctx.moveTo(42, sy); ctx.lineTo(w - 42, sy); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
 function mountParameters({ model, controller, document: doc, configuration }) {
   const scope = panelScope(), element = panelElement(doc, 'ppw-params');
   let signature, controls = new Map(), fields = panelScope();
@@ -15641,11 +16885,23 @@ function mountComparison({ model, controller, document: doc }) {
 }
 
 function mountExport({ model, controller, document: doc }) {
-  const scope = panelScope(), element = panelElement(doc, 'ppw-export-row', '<button class="ppw-export-svg">Export SVG</button><button class="ppw-export-tikz">Export TikZ</button>');
+  const scope = panelScope(), element = panelElement(doc, 'ppw-export-row', '<button class="ppw-export-svg">Export SVG</button><button class="ppw-export-bif-svg">Export Bifurcation SVG</button><button class="ppw-export-tikz">Export TikZ</button>');
   scope.on(element.querySelector('.ppw-export-svg'), 'click', () => {
     if (controller.error) return;
     const canvas = new C2S(500, 500); drawPhasePlane(model, canvas, 500, 500, plotTheme(element));
     downloadBlob(doc, new Blob([canvas.getSerializedSvg(true)], { type: 'image/svg+xml' }), 'phase_plane.svg');
+  });
+  const bifSvg = element.querySelector('.ppw-export-bif-svg');
+  scope.on(bifSvg, 'click', () => {
+    const branches = model.get('bifurcation_branches') || [];
+    if (controller.error || !branches.length) return;
+    const has1d = branches.some(b => b && (b.type === 'EP' || b.type === 'LC'));
+    const has2d = branches.some(b => b && (b.type === 'LP2' || b.type === 'HB2'));
+    const use2d = (model.get('bifurcation_config')?.viewMode === '2d' && has2d) || (!has1d && has2d);
+    const canvas = new C2S(560, 420);
+    if (use2d) drawBifurcation2D(model, canvas, 560, 420, plotTheme(element));
+    else drawBifurcation1D(model, canvas, 560, 420, plotTheme(element));
+    downloadBlob(doc, new Blob([canvas.getSerializedSvg(true)], { type: 'image/svg+xml' }), 'bifurcation.svg');
   });
   const tikz = element.querySelector('.ppw-export-tikz');
   const standalone = model._isMock || typeof model.send !== 'function';
@@ -15653,7 +16909,10 @@ function mountExport({ model, controller, document: doc }) {
   scope.on(tikz, 'click', () => model.send({ type: 'export_tikz' }));
   const receive = message => { if (message?.type === 'tikz_data') downloadBlob(doc, new Blob([message.content], { type: 'application/x-tex' }), message.filename || 'phase_plane.tex'); };
   if (!standalone) { model.on('msg:custom', receive); scope.cleanup(() => model.off('msg:custom', receive)); }
-  return mountedPanel(element, scope, () => { element.querySelector('.ppw-export-svg').disabled = !!controller.error; });
+  return mountedPanel(element, scope, () => {
+    element.querySelector('.ppw-export-svg').disabled = !!controller.error;
+    bifSvg.disabled = !!controller.error || !(model.get('bifurcation_branches') || []).length;
+  });
 }
 function mountPhasePlane({ model, controller, document: doc }) {
   const scope = panelScope(), element = panelElement(doc, 'ppw-phase-container', `
@@ -15785,6 +17044,394 @@ function mountSweep({ model, controller, document: doc, navigation = false }) {
     element.querySelector('canvas').hidden = !hasResults;
     if (hasResults) surface.render();
   });
+}
+export function mountBifurcation({ model, controller, document: doc, el } = {}) {
+  const targetDoc = doc || el?.ownerDocument || globalThis.document;
+  const scope = panelScope(), owner = {};
+  const element = panelElement(targetDoc, 'ppw-bifurcation', `
+    <div class="ppw-bif-header">Bifurcation continuation</div>
+    <div class="ppw-bif-toolbar">
+      <label>Parameter <select class="ppw-bif-param1" aria-label="Continuation parameter"></select></label>
+      <label>Observable <select class="ppw-bif-obs" aria-label="Observable"></select></label>
+      <button type="button" class="ppw-bif-trace">Trace equilibria</button>
+      <button type="button" class="ppw-bif-cancel" disabled>Cancel</button>
+      <button type="button" class="ppw-bif-clear">Clear</button>
+      <div class="ppw-bif-view-switch" hidden>
+        <button type="button" class="ppw-bif-mode-1d" aria-pressed="true">1D</button>
+        <button type="button" class="ppw-bif-mode-2d" aria-pressed="false">2D</button>
+      </div>
+    </div>
+    <div class="ppw-bif-presets" hidden></div>
+    <div class="ppw-bif-stale" role="status" hidden>
+      <span>Other parameters changed — Re-run</span>
+      <button type="button" class="ppw-bif-rerun">Re-run</button>
+    </div>
+    <div class="ppw-bif-nonsmooth" role="note" hidden></div>
+    <div class="ppw-bif-nd-note" hidden>Full N-D continuation; clicking a branch updates clamped variables to match.</div>
+    <div class="ppw-bif-error" role="alert" hidden></div>
+    <canvas class="ppw-bif-canvas" role="img" aria-label="Bifurcation diagram"></canvas>
+    <output class="ppw-bif-status"></output>
+    <div class="ppw-bif-chips"></div>
+    <details class="ppw-bif-advanced">
+      <summary>Advanced settings &amp; diagnostics</summary>
+      <div class="ppw-bif-settings">
+        <label>rl0 <input type="number" step="any" data-cfg="rl0" placeholder="auto"></label>
+        <label>rl1 <input type="number" step="any" data-cfg="rl1" placeholder="auto"></label>
+        <label>ds <input type="number" step="any" data-cfg="ds" value="0.05"></label>
+        <label>dsmax <input type="number" step="any" data-cfg="dsmax" value="0.2"></label>
+        <label>nmx <input type="number" step="1" min="10" data-cfg="nmx" value="200"></label>
+        <label>ntst <input type="number" step="1" min="5" data-cfg="ntst" value="50"></label>
+        <label>ncol <input type="number" step="1" min="2" max="7" data-cfg="ncol" value="4"></label>
+      </div>
+      <pre class="ppw-bif-diagnostics"></pre>
+    </details>`);
+
+  const param1Select = element.querySelector('.ppw-bif-param1');
+  const obsSelect = element.querySelector('.ppw-bif-obs');
+  const traceBtn = element.querySelector('.ppw-bif-trace');
+  const cancelBtn = element.querySelector('.ppw-bif-cancel');
+  const clearBtn = element.querySelector('.ppw-bif-clear');
+  const viewSwitch = element.querySelector('.ppw-bif-view-switch');
+  const mode1DBtn = element.querySelector('.ppw-bif-mode-1d');
+  const mode2DBtn = element.querySelector('.ppw-bif-mode-2d');
+  const presetsBox = element.querySelector('.ppw-bif-presets');
+  const staleBanner = element.querySelector('.ppw-bif-stale');
+  const rerunBtn = element.querySelector('.ppw-bif-rerun');
+  const nonSmoothBox = element.querySelector('.ppw-bif-nonsmooth');
+  const ndNote = element.querySelector('.ppw-bif-nd-note');
+  const errorBox = element.querySelector('.ppw-bif-error');
+  const canvas = element.querySelector('.ppw-bif-canvas');
+  const statusOut = element.querySelector('.ppw-bif-status');
+  const chipsBox = element.querySelector('.ppw-bif-chips');
+  const diagPre = element.querySelector('.ppw-bif-diagnostics');
+  const advInputs = [...element.querySelectorAll('.ppw-bif-settings input[data-cfg]')];
+
+  let viewMode = '1d';
+  let paramSig = '', obsSig = '', presetsSig = '', chipsSig = '';
+
+  const surface = canvasSurface(
+    canvas,
+    scope,
+    (ctx, w, h, theme) => (viewMode === '2d'
+      ? drawBifurcation2D(model, ctx, w, h, theme)
+      : drawBifurcation1D(model, ctx, w, h, theme)),
+    { width: 560, ratio: 0.62, minHeight: 240 },
+  );
+
+  function readAdvancedConfig() {
+    const out = {};
+    for (const input of advInputs) {
+      const key = input.dataset.cfg;
+      const raw = input.value.trim();
+      if (raw === '') continue;
+      const num = Number(raw);
+      if (Number.isFinite(num)) out[key] = num;
+    }
+    return out;
+  }
+
+  function updateConfig(patch) {
+    const prev = model.get('bifurcation_config') || {};
+    controller.commit({ bifurcation_config: { ...prev, ...patch } });
+  }
+
+  function canvasCoords(event) {
+    const rect = canvas.getBoundingClientRect();
+    const w = surface.width, h = surface.height;
+    const rw = rect.width || w, rh = rect.height || h;
+    return [
+      (event.clientX - rect.left) * w / rw,
+      (event.clientY - rect.top) * h / rh,
+      w,
+      h,
+    ];
+  }
+
+  function findNearest1D(sx, sy, w, h) {
+    const bounds = bifurcation1DBounds(model);
+    let best = null, bestDist = Infinity;
+    for (const br of bounds.branches) {
+      for (const pt of br.points || []) {
+        const yVal = br.type === 'LC'
+          ? bifurcationObservableValue(pt, bounds.obsKey, 'u_max')
+          : bifurcationObservableValue(pt, bounds.obsKey, 'u');
+        if (!Number.isFinite(pt.p) || !Number.isFinite(yVal)) continue;
+        const [px, py] = worldToScreen(pt.p, yVal, bounds.xlim, bounds.ylim, w, h);
+        const d = Math.hypot(px - sx, py - sy);
+        if (d < bestDist) { bestDist = d; best = { point: pt, branch: br, yVal, dist: d }; }
+        if (br.type === 'LC') {
+          const yMin = bifurcationObservableValue(pt, bounds.obsKey, 'u_min');
+          if (Number.isFinite(yMin)) {
+            const [px2, py2] = worldToScreen(pt.p, yMin, bounds.xlim, bounds.ylim, w, h);
+            const d2 = Math.hypot(px2 - sx, py2 - sy);
+            if (d2 < bestDist) { bestDist = d2; best = { point: pt, branch: br, yVal: yMin, dist: d2 }; }
+          }
+        }
+      }
+    }
+    return { best, bounds };
+  }
+
+  function findNearest2D(sx, sy, w, h) {
+    const bounds = bifurcation2DBounds(model);
+    let best = null, bestDist = Infinity;
+    for (const br of bounds.branches) {
+      for (const pt of br.points || []) {
+        if (!Number.isFinite(pt.p) || !Number.isFinite(pt.p2)) continue;
+        const [px, py] = worldToScreen(pt.p, pt.p2, bounds.xlim, bounds.ylim, w, h);
+        const d = Math.hypot(px - sx, py - sy);
+        if (d < bestDist) { bestDist = d; best = { point: pt, branch: br, dist: d }; }
+      }
+    }
+    return { best, bounds };
+  }
+
+  scope.on(param1Select, 'change', () => updateConfig({ param1: param1Select.value }));
+  scope.on(obsSelect, 'change', () => {
+    const val = obsSelect.value;
+    updateConfig({ observable: val === 'L2' ? 'L2' : Number(val) });
+  });
+  scope.on(traceBtn, 'click', () => {
+    controller.startEquilibriumContinuation({ param1: param1Select.value, ...readAdvancedConfig() }, owner);
+  });
+  scope.on(rerunBtn, 'click', () => {
+    controller.startEquilibriumContinuation({ param1: param1Select.value, ...readAdvancedConfig() }, owner);
+  });
+  scope.on(cancelBtn, 'click', () => controller.cancelBifurcation(owner));
+  scope.on(clearBtn, 'click', () => controller.clearBifurcation());
+  scope.on(mode1DBtn, 'click', () => { viewMode = '1d'; update(); });
+  scope.on(mode2DBtn, 'click', () => { viewMode = '2d'; update(); });
+
+  for (const input of advInputs) {
+    scope.on(input, 'change', () => {
+      const key = input.dataset.cfg;
+      const raw = input.value.trim();
+      const prev = { ...(model.get('bifurcation_config') || {}) };
+      if (raw === '') delete prev[key];
+      else if (Number.isFinite(Number(raw))) prev[key] = Number(raw);
+      controller.commit({ bifurcation_config: prev });
+    });
+  }
+
+  scope.on(canvas, 'click', (event) => {
+    const [sx, sy, w, h] = canvasCoords(event);
+    if (sx < 42 || sy < 42 || sx > w - 42 || sy > h - 42) return;
+    if (viewMode === '2d') {
+      const { best, bounds } = findNearest2D(sx, sy, w, h);
+      if (best && best.dist <= 30) {
+        controller.jumpToBifurcationPoint(best.point, best.branch);
+      } else {
+        const [p1Val, p2Val] = screenToWorld(sx, sy, bounds.xlim, bounds.ylim, w, h);
+        controller.jumpToBifurcationPoint(
+          { p: p1Val, p2: p2Val },
+          { type: 'LP2', param1: bounds.param1, param2: bounds.param2 },
+        );
+      }
+      return;
+    }
+    const { best, bounds } = findNearest1D(sx, sy, w, h);
+    if (best && best.dist <= 30) {
+      controller.jumpToBifurcationPoint(best.point, best.branch);
+    } else {
+      const [pClick] = screenToWorld(sx, sy, bounds.xlim, bounds.ylim, w, h);
+      controller.jumpToBifurcationPoint({ p: pClick }, { type: 'EP', param1: bounds.param1 });
+    }
+  });
+
+  scope.on(canvas, 'mousemove', (event) => {
+    const branches = model.get('bifurcation_branches') || [];
+    if (branches.length === 0) return;
+    const [sx, sy, w, h] = canvasCoords(event);
+    if (sx < 42 || sy < 42 || sx > w - 42 || sy > h - 42) {
+      statusOut.textContent = '';
+      return;
+    }
+    if (viewMode === '2d') {
+      const { best, bounds } = findNearest2D(sx, sy, w, h);
+      if (best) {
+        statusOut.textContent = `${bounds.param1} = ${Number(best.point.p).toPrecision(4)} · ${bounds.param2} = ${Number(best.point.p2).toPrecision(4)} · ${best.branch.type}`;
+      }
+      return;
+    }
+    const { best } = findNearest1D(sx, sy, w, h);
+    if (!best) return;
+    const pt = best.point;
+    const stab = pt.stable ? 'stable' : 'unstable';
+    if (best.branch.type === 'LC') {
+      const period = Number(pt.period);
+      const freq = Number.isFinite(period) && period > 0 ? 1 / period : NaN;
+      statusOut.textContent = `p = ${Number(pt.p).toPrecision(4)} · period = ${Number.isFinite(period) ? period.toPrecision(4) : '—'} · freq = ${Number.isFinite(freq) ? freq.toPrecision(4) : '—'} · ${stab} LC`;
+    } else {
+      statusOut.textContent = `p = ${Number(pt.p).toPrecision(4)} · y = ${Number(best.yVal).toPrecision(4)} · ${stab} EP`;
+    }
+  });
+
+  scope.on(canvas, 'mouseleave', () => { statusOut.textContent = ''; });
+
+  function renderChips(specialPoints, branches, paramNames, running) {
+    const branchById = new Map(branches.map(b => [b.id, b]));
+    chipsBox.replaceChildren();
+    for (const sp of specialPoints) {
+      const chip = targetDoc.createElement('div');
+      chip.className = 'ppw-bif-chip';
+      chip.dataset.spId = sp.id;
+      chip.dataset.spTy = sp.ty;
+
+      const jumpBtn = targetDoc.createElement('button');
+      jumpBtn.type = 'button';
+      jumpBtn.className = 'ppw-bif-chip-jump';
+      jumpBtn.textContent = `${sp.label || sp.id} (p=${Number(sp.p).toPrecision(4)})`;
+      jumpBtn.addEventListener('click', () => controller.jumpToBifurcationPoint(sp, branchById.get(sp.branch_id) || null));
+      chip.append(jumpBtn);
+
+      if (sp.ty === 'HB') {
+        const lcBtn = targetDoc.createElement('button');
+        lcBtn.type = 'button';
+        lcBtn.className = 'ppw-bif-switch-lc';
+        lcBtn.textContent = '→ Limit cycle';
+        lcBtn.disabled = running;
+        lcBtn.addEventListener('click', () => controller.switchToLimitCycle(sp.id, readAdvancedConfig(), owner));
+        chip.append(lcBtn);
+      }
+
+      if (sp.ty === 'HB' || sp.ty === 'LP') {
+        const otherParams = paramNames.filter(p => p !== sp.param1);
+        if (otherParams.length > 0) {
+          const p2Select = targetDoc.createElement('select');
+          p2Select.className = 'ppw-bif-param2';
+          p2Select.setAttribute('aria-label', `Second parameter for ${sp.label || sp.id}`);
+          for (const p of otherParams) {
+            const opt = targetDoc.createElement('option');
+            opt.value = p; opt.textContent = p;
+            p2Select.append(opt);
+          }
+          const twoDBtn = targetDoc.createElement('button');
+          twoDBtn.type = 'button';
+          twoDBtn.className = 'ppw-bif-trace-2d';
+          twoDBtn.textContent = '→ 2D curve';
+          twoDBtn.disabled = running;
+          twoDBtn.addEventListener('click', () => controller.startTwoParamContinuation(sp.id, p2Select.value, readAdvancedConfig(), owner));
+          chip.append(p2Select, twoDBtn);
+        }
+      }
+
+      if (sp.ty === 'LPC' || sp.ty === 'PD') {
+        const badge = targetDoc.createElement('span');
+        badge.className = 'ppw-bif-chip-badge';
+        badge.textContent = 'LC-to-2D (v2)';
+        badge.title = 'LC-to-2D continuation is planned for v2';
+        chip.append(badge);
+      }
+
+      chipsBox.append(chip);
+    }
+  }
+
+  function update() {
+    const paramNames = Object.keys(model.get('param_info') || model.get('params') || {});
+    const stateNames = model.get('state_names') || [];
+    const cfg = model.get('bifurcation_config') || {};
+    const branches = model.get('bifurcation_branches') || [];
+    const specialPoints = model.get('bifurcation_special_points') || [];
+    const presets = model.get('bifurcation_presets') || [];
+    const meta = model.get('bifurcation_metadata') || {};
+    const running = !!model.get('bifurcation_running');
+
+    const nextParamSig = JSON.stringify(paramNames);
+    if (nextParamSig !== paramSig) {
+      paramSig = nextParamSig;
+      const prev = param1Select.value;
+      param1Select.replaceChildren();
+      for (const p of paramNames) {
+        const opt = targetDoc.createElement('option');
+        opt.value = p; opt.textContent = p;
+        param1Select.append(opt);
+      }
+      if (cfg.param1 && paramNames.includes(cfg.param1)) param1Select.value = cfg.param1;
+      else if (prev && paramNames.includes(prev)) param1Select.value = prev;
+    } else if (cfg.param1 && paramNames.includes(cfg.param1) && param1Select.value !== cfg.param1) {
+      param1Select.value = cfg.param1;
+    }
+
+    const nextObsSig = JSON.stringify(stateNames);
+    if (nextObsSig !== obsSig) {
+      obsSig = nextObsSig;
+      obsSelect.replaceChildren();
+      stateNames.forEach((name, idx) => {
+        const opt = targetDoc.createElement('option');
+        opt.value = String(idx); opt.textContent = name;
+        obsSelect.append(opt);
+      });
+      const l2Opt = targetDoc.createElement('option');
+      l2Opt.value = 'L2'; l2Opt.textContent = 'L2 norm';
+      obsSelect.append(l2Opt);
+    }
+    const desiredObs = cfg.observable === 'L2' || cfg.observable === 'l2'
+      ? 'L2'
+      : String(Number.isInteger(cfg.observable) ? cfg.observable : 0);
+    if ([...obsSelect.options].some(o => o.value === desiredObs)) obsSelect.value = desiredObs;
+
+    const nextPresetsSig = JSON.stringify(presets.map(p => p.label || p.name || p.param1));
+    if (nextPresetsSig !== presetsSig) {
+      presetsSig = nextPresetsSig;
+      presetsBox.replaceChildren();
+      presetsBox.hidden = presets.length === 0;
+      presets.forEach((preset, idx) => {
+        const btn = targetDoc.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ppw-bif-preset-btn';
+        btn.textContent = preset.label || preset.name || `Preset ${idx + 1}`;
+        btn.addEventListener('click', () => controller.runBifurcationPreset(idx, owner));
+        presetsBox.append(btn);
+      });
+    }
+    for (const btn of presetsBox.querySelectorAll('button')) btn.disabled = running;
+
+    traceBtn.disabled = running || !param1Select.value;
+    cancelBtn.disabled = !running;
+    clearBtn.disabled = running && branches.length === 0;
+
+    const has2D = branches.some(b => b && (b.type === 'LP2' || b.type === 'HB2'));
+    viewSwitch.hidden = !has2D;
+    if (!has2D && viewMode === '2d') viewMode = '1d';
+    mode1DBtn.setAttribute('aria-pressed', String(viewMode === '1d'));
+    mode2DBtn.setAttribute('aria-pressed', String(viewMode === '2d'));
+
+    staleBanner.hidden = !meta.stale;
+    rerunBtn.disabled = running;
+
+    const nonSmoothTokens = detectNonSmoothExpressions(model.get('model_spec'));
+    nonSmoothBox.hidden = nonSmoothTokens.length === 0;
+    if (nonSmoothTokens.length > 0) {
+      nonSmoothBox.textContent = `Non-smooth expression detected (${nonSmoothTokens.join(', ')}): continuation may fail or miss bifurcations.`;
+    }
+
+    ndNote.hidden = stateNames.length <= 2;
+
+    errorBox.hidden = !meta.error;
+    errorBox.textContent = meta.error || '';
+
+    for (const input of advInputs) {
+      const key = input.dataset.cfg;
+      if (key in cfg && targetDoc.activeElement !== input) input.value = cfg[key];
+    }
+    diagPre.textContent = meta.fort9 || meta.status || '';
+
+    const nextChipsSig = JSON.stringify({ specialPoints, paramNames, running });
+    if (nextChipsSig !== chipsSig) {
+      chipsSig = nextChipsSig;
+      renderChips(specialPoints, branches, paramNames, running);
+    }
+
+    surface.render();
+  }
+
+  scope.cleanup(() => controller.cancelBifurcation(owner));
+  if (el) {
+    el.append(element);
+    update();
+  }
+  return mountedPanel(element, scope, update);
 }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
 
@@ -16064,6 +17711,7 @@ const PRESENTATION_LABELS = {
   comparison: 'Comparison lens', lesson: 'Guided lesson',
   multiples: 'Small multiples', navigator: 'Bifurcation navigator', basin: 'Initial-condition explorer',
   evidence: 'Evidence notebook', prediction: 'Prediction & reveal', ensemble: 'Stochastic ensemble',
+  bifurcation: 'Bifurcation & phase plane',
 };
 const RESEARCH_KINDS = ['multiples', 'navigator', 'basin', 'evidence', 'prediction', 'ensemble'];
 const TRACE_COLORS = ['#1769aa', '#d04b27', '#008577', '#963ab0', '#a37300', '#cf3973', '#4d6599', '#527c23'];
@@ -16400,7 +18048,7 @@ function mountPresentation(context, kind = context.configuration.get('presentati
   function inspector(container, initial = 'details') {
     const label = doc.createElement('label'); label.className = 'ppw-tool-picker'; label.append(doc.createTextNode('Tool '));
     const select = doc.createElement('select'); select.setAttribute('aria-label', 'Inspector section'); label.append(select); container.append(label);
-    const tools = { details: 'Model & equilibria', parameters: 'All parameters', noise: 'Noise & integrator', layers: 'Plot layers', projection: 'Projection / fixed state', limits: 'Axes & duration', sweep: 'Parameter sweep', editor: 'Equation editor', export: 'Export', model: 'Choose model' };
+    const tools = { details: 'Model & equilibria', parameters: 'All parameters', noise: 'Noise & integrator', layers: 'Plot layers', projection: 'Projection / fixed state', limits: 'Axes & duration', sweep: 'Parameter sweep', bifurcation: 'Bifurcation (AUTO)', editor: 'Equation editor', export: 'Export', model: 'Choose model' };
     for (const [value, text] of Object.entries(tools)) { const option = doc.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
     const content = slot(container, 'ppw-inspector-content'); let current;
     function choose() { current?.dispose(); current = group(content, [select.value]); }
@@ -16450,12 +18098,18 @@ function mountPresentation(context, kind = context.configuration.get('presentati
     }
     for (const task of Object.keys(descriptions)) buttons.push(button(task, 'ppw-task-tab', () => choose(task), nav));
     choose(active);
+  } else if (kind === 'bifurcation') {
+    group(slot(body, 'ppw-bifurcation-primary'), ['bifurcation']);
+    const right = slot(body, 'ppw-bif-secondary');
+    group(slot(right, 'ppw-secondary-plot'), ['phase_plane'], { fit: true });
+    group(slot(right, 'ppw-secondary-plot'), ['time_series'], { fit: true });
+    group(footer, ['parameters'], { primary: true });
   } else if (RESEARCH_KINDS.includes(kind)) {
     group(body, [kind]); group(footer, ['parameters'], { primary: true });
   } else { throw new Error('Unknown presentation: ' + kind); }
   function update() {
     title.textContent = PRESENTATION_LABELS[kind];
-    badges.textContent = `${(model.get('model_name') || '').replaceAll('_', ' ')}${model.get('noise_enable') ? ' · noise on' : ''}${model.get('reference_trajectory')?.length ? ' · frozen reference' : ''}${model.get('sweep_running') ? ' · sweep running' : ''}`;
+    badges.textContent = `${(model.get('model_name') || '').replaceAll('_', ' ')}${model.get('noise_enable') ? ' · noise on' : ''}${model.get('reference_trajectory')?.length ? ' · frozen reference' : ''}${model.get('sweep_running') ? ' · sweep running' : ''}${model.get('bifurcation_running') ? ' · continuation running' : ''}`;
     error.textContent = controller.error?.message || ''; error.hidden = !controller.error;
     for (const instance of [...groups]) instance.update();
     expanded?.composition.update();
@@ -16496,6 +18150,7 @@ const PANEL_FACTORIES = {
   limits: mountLimits, noise: mountNoise, layers: mountLayers,
   comparison: mountComparison, export: mountExport, editor: mountEditor,
   phase_plane: mountPhasePlane, time_series: mountTimeSeries, sweep: mountSweep,
+  bifurcation: mountBifurcation,
 };
 const DEFAULT_PANELS = ['model', 'parameters', 'projection', 'limits', 'noise', 'layers', 'comparison', 'export', 'editor', 'phase_plane', 'time_series', 'sweep'];
 

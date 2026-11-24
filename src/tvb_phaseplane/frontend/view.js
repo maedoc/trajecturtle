@@ -31,6 +31,7 @@ const PANEL_FACTORIES = {
   limits: mountLimits, noise: mountNoise, layers: mountLayers,
   comparison: mountComparison, export: mountExport, editor: mountEditor,
   phase_plane: mountPhasePlane, time_series: mountTimeSeries, sweep: mountSweep,
+  bifurcation: mountBifurcation,
 };
 const DEFAULT_PANELS = ['model', 'parameters', 'projection', 'limits', 'noise', 'layers', 'comparison', 'export', 'editor', 'phase_plane', 'time_series', 'sweep'];
 

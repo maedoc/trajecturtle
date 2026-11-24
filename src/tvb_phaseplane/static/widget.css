@@ -147,7 +147,7 @@
 .ppw-drawer .ppw-stage-body { height: 420px; grid-template-columns: minmax(0, 1fr); }
 .ppw-drawer.ppw-drawer-open .ppw-stage-body { grid-template-columns: minmax(0, 1fr) minmax(230px, 34%); }
 .ppw-instrument-drawer { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); border-left: 1px solid var(--ppw-border); padding-left: 8px; }
-.ppw-composition.ppw-bench, .ppw-composition.ppw-lens, .ppw-composition.ppw-lesson { aspect-ratio: 16 / 9; display: grid; grid-template-areas: 'toolbar' 'error' 'body' 'footer'; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.ppw-composition.ppw-bench, .ppw-composition.ppw-lens, .ppw-composition.ppw-lesson, .ppw-composition.ppw-bifurcation { aspect-ratio: 16 / 9; display: grid; grid-template-areas: 'toolbar' 'error' 'body' 'footer'; grid-template-rows: auto auto minmax(0, 1fr) auto; }
 .ppw-composition > .ppw-stage-toolbar { grid-area: toolbar; }
 .ppw-presentation-error { grid-area: error; color: var(--ppw-error); padding: 4px 8px; }
 .ppw-composition > .ppw-stage-body { grid-area: body; }
@@ -182,15 +182,51 @@
 .ppw-expanded-workspace::backdrop { background: #17202b88; }
 .ppw-close-workspace { margin-bottom: 6px; }
 @container ppw (max-width: 700px) {
-  .ppw-composition.ppw-bench, .ppw-composition.ppw-lens, .ppw-composition.ppw-lesson { aspect-ratio: auto; }
-  .ppw-bench .ppw-stage-body, .ppw-composition.ppw-lens .ppw-stage-body, .ppw-lesson .ppw-stage-body { grid-template-columns: 1fr; }
+  .ppw-composition.ppw-bench, .ppw-composition.ppw-lens, .ppw-composition.ppw-lesson, .ppw-composition.ppw-bifurcation { aspect-ratio: auto; }
+  .ppw-bench .ppw-stage-body, .ppw-composition.ppw-lens .ppw-stage-body, .ppw-lesson .ppw-stage-body, .ppw-bifurcation .ppw-stage-body { grid-template-columns: 1fr; }
   .ppw-figure .ppw-stage-body { height: auto; }
   .ppw-composition .ppw-primary-plot { height: 310px; }
   .ppw-composition .ppw-secondary-plot { height: 260px; }
   .ppw-bench-secondary { grid-template-rows: 260px 210px; }
+  .ppw-bif-secondary { grid-template-rows: 260px 260px; }
   .ppw-drawer.ppw-drawer-open .ppw-stage-body { height: auto; grid-template-columns: 1fr; }
   .ppw-instrument-drawer { height: 240px; border-left: 0; border-top: 1px solid var(--ppw-border); padding: 8px 0 0; }
   .ppw-stage-badges { flex-basis: 100%; order: 2; }
   .ppw-stage-footer .ppw-params { flex-wrap: wrap; }
   .ppw-stage-footer .ppw-param { flex-basis: 180px; }
+}
+
+/* AUTO2000 bifurcation continuation panel & presentation */
+.ppw-bifurcation { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ppw-bif-header { font-weight: 650; }
+.ppw-bif-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ppw-bif-toolbar label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.ppw-bif-view-switch { display: inline-flex; gap: 4px; }
+.ppw-bif-view-switch button[aria-pressed=true] { border-color: var(--ppw-accent); color: var(--ppw-accent); font-weight: 600; }
+.ppw-bif-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.ppw-bif-preset-btn { font-size: 12px; padding: 3px 8px; min-height: 26px; }
+.ppw-bif-banner, .ppw-bif-stale, .ppw-bif-nonsmooth, .ppw-bif-nd-note, .ppw-bif-error {
+    font-size: 12px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--ppw-border); background: var(--ppw-bg);
+}
+.ppw-bif-stale { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.ppw-bif-error { color: var(--ppw-error); border-color: var(--ppw-error); }
+.ppw-bif-status { display: block; font-size: 12px; color: var(--ppw-muted); min-height: 1.4em; font-variant-numeric: tabular-nums; }
+.ppw-bif-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ppw-bif-chip {
+    display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px;
+    padding: 4px 7px; border: 1px solid var(--ppw-border); border-radius: 6px; background: var(--ppw-bg); font-size: 12px;
+}
+.ppw-bif-chip-badge { font-size: 11px; color: var(--ppw-muted); }
+.ppw-bif-advanced { border: 1px solid var(--ppw-border); border-radius: 6px; padding: 6px 8px; background: var(--ppw-bg); font-size: 12px; }
+.ppw-bif-advanced summary { cursor: pointer; font-weight: 600; color: var(--ppw-muted); }
+.ppw-bif-settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px 10px; margin-top: 8px; }
+.ppw-bif-settings label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+.ppw-bif-settings input[type=number] { width: 100%; }
+.ppw-bif-diagnostics { margin: 8px 0 0; padding: 6px; border-radius: 4px; background: var(--ppw-surface); border: 1px solid var(--ppw-border); font: 11px/1.4 monospace; max-height: 140px; overflow: auto; white-space: pre-wrap; }
+.ppw-bifurcation .ppw-stage-body { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+.ppw-bifurcation-primary { min-width: 0; min-height: 0; overflow: auto; }
+.ppw-bif-secondary { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+@container ppw (max-width: 640px) {
+  .ppw-bif-toolbar { flex-direction: column; align-items: stretch; }
+  .ppw-bif-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

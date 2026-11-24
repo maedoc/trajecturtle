@@ -5,6 +5,7 @@ const PRESENTATION_LABELS = {
   comparison: 'Comparison lens', lesson: 'Guided lesson',
   multiples: 'Small multiples', navigator: 'Bifurcation navigator', basin: 'Initial-condition explorer',
   evidence: 'Evidence notebook', prediction: 'Prediction & reveal', ensemble: 'Stochastic ensemble',
+  bifurcation: 'Bifurcation & phase plane',
 };
 const RESEARCH_KINDS = ['multiples', 'navigator', 'basin', 'evidence', 'prediction', 'ensemble'];
 const TRACE_COLORS = ['#1769aa', '#d04b27', '#008577', '#963ab0', '#a37300', '#cf3973', '#4d6599', '#527c23'];

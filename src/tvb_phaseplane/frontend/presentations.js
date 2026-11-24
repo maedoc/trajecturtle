@@ -107,7 +107,7 @@ function mountPresentation(context, kind = context.configuration.get('presentati
   function inspector(container, initial = 'details') {
     const label = doc.createElement('label'); label.className = 'ppw-tool-picker'; label.append(doc.createTextNode('Tool '));
     const select = doc.createElement('select'); select.setAttribute('aria-label', 'Inspector section'); label.append(select); container.append(label);
-    const tools = { details: 'Model & equilibria', parameters: 'All parameters', noise: 'Noise & integrator', layers: 'Plot layers', projection: 'Projection / fixed state', limits: 'Axes & duration', sweep: 'Parameter sweep', editor: 'Equation editor', export: 'Export', model: 'Choose model' };
+    const tools = { details: 'Model & equilibria', parameters: 'All parameters', noise: 'Noise & integrator', layers: 'Plot layers', projection: 'Projection / fixed state', limits: 'Axes & duration', sweep: 'Parameter sweep', bifurcation: 'Bifurcation (AUTO)', editor: 'Equation editor', export: 'Export', model: 'Choose model' };
     for (const [value, text] of Object.entries(tools)) { const option = doc.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
     const content = slot(container, 'ppw-inspector-content'); let current;
     function choose() { current?.dispose(); current = group(content, [select.value]); }
@@ -157,12 +157,18 @@ function mountPresentation(context, kind = context.configuration.get('presentati
     }
     for (const task of Object.keys(descriptions)) buttons.push(button(task, 'ppw-task-tab', () => choose(task), nav));
     choose(active);
+  } else if (kind === 'bifurcation') {
+    group(slot(body, 'ppw-bifurcation-primary'), ['bifurcation']);
+    const right = slot(body, 'ppw-bif-secondary');
+    group(slot(right, 'ppw-secondary-plot'), ['phase_plane'], { fit: true });
+    group(slot(right, 'ppw-secondary-plot'), ['time_series'], { fit: true });
+    group(footer, ['parameters'], { primary: true });
   } else if (RESEARCH_KINDS.includes(kind)) {
     group(body, [kind]); group(footer, ['parameters'], { primary: true });
   } else { throw new Error('Unknown presentation: ' + kind); }
   function update() {
     title.textContent = PRESENTATION_LABELS[kind];
-    badges.textContent = `${(model.get('model_name') || '').replaceAll('_', ' ')}${model.get('noise_enable') ? ' · noise on' : ''}${model.get('reference_trajectory')?.length ? ' · frozen reference' : ''}${model.get('sweep_running') ? ' · sweep running' : ''}`;
+    badges.textContent = `${(model.get('model_name') || '').replaceAll('_', ' ')}${model.get('noise_enable') ? ' · noise on' : ''}${model.get('reference_trajectory')?.length ? ' · frozen reference' : ''}${model.get('sweep_running') ? ' · sweep running' : ''}${model.get('bifurcation_running') ? ' · continuation running' : ''}`;
     error.textContent = controller.error?.message || ''; error.hidden = !controller.error;
     for (const instance of [...groups]) instance.update();
     expanded?.composition.update();

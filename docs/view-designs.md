@@ -314,6 +314,6 @@ experiment.to_standalone_html("bench.html", views=[{
 ```
 
 Valid experimental presentations are `figure`, `bench`, `drawer`, `comparison`,
-`lesson`, `multiples`, `navigator`, `basin`, `evidence`, `prediction` and `ensemble`. Existing `panels=[...]` compositions remain available unchanged.
+`lesson`, `multiples`, `navigator`, `basin`, `evidence`, `prediction`, `ensemble` and `bifurcation`. Existing `panels=[...]` compositions remain available unchanged.
 The public API and exact proportions may evolve based on this lab's feedback.
 Other host environments remain deferred while we explore these compositions.

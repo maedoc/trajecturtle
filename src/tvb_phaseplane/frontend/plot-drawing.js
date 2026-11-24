@@ -300,3 +300,296 @@ function drawSweep(model, sweepCtx, w, h, _results = model.get('sweep_results'),
     }
   }
 }
+
+function bifurcationObservableValue(pt, obsKey, which = 'u') {
+  if (!pt) return NaN;
+  const vec = which === 'u_max' ? (pt.u_max || pt.u) : which === 'u_min' ? (pt.u_min || pt.u) : pt.u;
+  if (!Array.isArray(vec) || vec.length === 0) return NaN;
+  if (obsKey === 'L2' || obsKey === 'l2') {
+    let sq = 0;
+    for (let i = 0; i < vec.length; i++) sq += vec[i] * vec[i];
+    return Math.sqrt(sq);
+  }
+  const idx = Number.isInteger(obsKey) ? obsKey : 0;
+  return Number(vec[idx] ?? vec[0]);
+}
+
+function _resolveBifurcationObs(model) {
+  const cfg = model.get('bifurcation_config') || {};
+  const stateNames = model.get('state_names') || [];
+  const raw = cfg.observable;
+  if (raw === 'L2' || raw === 'l2') return { obsKey: 'L2', obsLabel: 'L2 norm' };
+  if (typeof raw === 'string' && stateNames.includes(raw)) {
+    const idx = stateNames.indexOf(raw);
+    return { obsKey: idx, obsLabel: stateNames[idx] || 'u' + idx };
+  }
+  const parsed = Number.isInteger(raw) ? raw : (raw !== undefined && raw !== '' && Number.isFinite(Number(raw)) ? Math.trunc(Number(raw)) : 0);
+  const idx = Math.max(0, Math.min(Math.max(0, stateNames.length - 1), parsed));
+  return { obsKey: idx, obsLabel: stateNames[idx] || ('u' + idx) };
+}
+
+function _padBounds(min, max, frac = 0.05) {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [-1, 1];
+  if (min === max) return [min - 0.5, max + 0.5];
+  const margin = (max - min) * frac;
+  return [min - margin, max + margin];
+}
+
+function bifurcation1DBounds(model) {
+  const cfg = model.get('bifurcation_config') || {};
+  const branches = (model.get('bifurcation_branches') || []).filter(b => b && (b.type === 'EP' || b.type === 'LC'));
+  const sps = (model.get('bifurcation_special_points') || []).filter(sp => sp && sp.ty !== 'CP' && sp.ty !== 'BT' && sp.ty !== 'GH' && !sp.param2);
+  const meta = model.get('bifurcation_metadata') || {};
+  const param1 = cfg.param1 || branches[0]?.param1 || meta.active_params?.[0] || Object.keys(model.get('params') || {})[0] || 'p';
+  const { obsKey, obsLabel } = _resolveBifurcationObs(model);
+  let pMin = Infinity, pMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  const includeY = (v) => { if (Number.isFinite(v)) { yMin = Math.min(yMin, v); yMax = Math.max(yMax, v); } };
+  const includeP = (v) => { if (Number.isFinite(v)) { pMin = Math.min(pMin, v); pMax = Math.max(pMax, v); } };
+  for (const br of branches) {
+    for (const pt of br.points || []) {
+      includeP(pt.p);
+      if (br.type === 'LC') {
+        includeY(bifurcationObservableValue(pt, obsKey, 'u_max'));
+        includeY(bifurcationObservableValue(pt, obsKey, 'u_min'));
+      } else {
+        includeY(bifurcationObservableValue(pt, obsKey, 'u'));
+      }
+    }
+  }
+  for (const sp of sps) {
+    includeP(sp.p);
+    includeY(bifurcationObservableValue(sp, obsKey, 'u'));
+  }
+  return {
+    xlim: _padBounds(pMin, pMax, 0.05),
+    ylim: _padBounds(yMin, yMax, 0.1),
+    param1, obsKey, obsLabel, branches, specialPoints: sps,
+  };
+}
+
+function bifurcation2DBounds(model) {
+  const cfg = model.get('bifurcation_config') || {};
+  const branches = (model.get('bifurcation_branches') || []).filter(b => b && (b.type === 'LP2' || b.type === 'HB2'));
+  const branchIds = new Set(branches.map(b => b.id));
+  const sps = (model.get('bifurcation_special_points') || []).filter(sp => sp && (branchIds.has(sp.branch_id) || Number.isFinite(sp.p2) || sp.ty === 'CP' || sp.ty === 'BT' || sp.ty === 'GH'));
+  const paramNames = Object.keys(model.get('params') || {});
+  const param1 = branches[0]?.param1 || cfg.param1 || paramNames[0] || 'p1';
+  const param2 = branches[0]?.param2 || cfg.param2 || paramNames.find(k => k !== param1) || 'p2';
+  let p1Min = Infinity, p1Max = -Infinity, p2Min = Infinity, p2Max = -Infinity;
+  for (const br of branches) {
+    for (const pt of br.points || []) {
+      if (Number.isFinite(pt.p)) { p1Min = Math.min(p1Min, pt.p); p1Max = Math.max(p1Max, pt.p); }
+      if (Number.isFinite(pt.p2)) { p2Min = Math.min(p2Min, pt.p2); p2Max = Math.max(p2Max, pt.p2); }
+    }
+  }
+  for (const sp of sps) {
+    if (Number.isFinite(sp.p)) { p1Min = Math.min(p1Min, sp.p); p1Max = Math.max(p1Max, sp.p); }
+    if (Number.isFinite(sp.p2)) { p2Min = Math.min(p2Min, sp.p2); p2Max = Math.max(p2Max, sp.p2); }
+  }
+  return {
+    xlim: _padBounds(p1Min, p1Max, 0.05),
+    ylim: _padBounds(p2Min, p2Max, 0.05),
+    param1, param2, branches, specialPoints: sps,
+  };
+}
+
+function _drawBifurcationEmpty(ctx, w, h, theme, message) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = theme.background || theme.bg || DEFAULT_PLOT_THEME.background;
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = theme.muted || DEFAULT_PLOT_THEME.muted;
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(message, w / 2, h / 2);
+}
+
+function _drawStyledCurve(ctx, points, xlim, ylim, w, h, getXY, getStyle) {
+  let activeStyle = null, prevScreen = null;
+  const flush = () => {
+    if (!activeStyle) return;
+    ctx.strokeStyle = activeStyle.strokeStyle;
+    ctx.lineWidth = activeStyle.lineWidth;
+    ctx.setLineDash(activeStyle.dash);
+    ctx.stroke();
+    activeStyle = null;
+  };
+  for (const pt of points || []) {
+    const [wx, wy] = getXY(pt);
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) {
+      flush();
+      prevScreen = null;
+      continue;
+    }
+    const [sx, sy] = worldToScreen(wx, wy, xlim, ylim, w, h);
+    const style = getStyle(pt);
+    if (!activeStyle || activeStyle.key !== style.key) {
+      flush();
+      activeStyle = style;
+      ctx.beginPath();
+      if (prevScreen) {
+        ctx.moveTo(prevScreen[0], prevScreen[1]);
+        ctx.lineTo(sx, sy);
+      } else {
+        ctx.moveTo(sx, sy);
+      }
+    } else {
+      ctx.lineTo(sx, sy);
+    }
+    prevScreen = [sx, sy];
+  }
+  flush();
+  ctx.setLineDash([]);
+}
+
+function _drawSpecialPointMarker(ctx, sx, sy, sp, theme) {
+  const ty = sp.ty || '';
+  const r = 5;
+  ctx.save();
+  ctx.lineWidth = 1.5;
+  if (ty === 'HB' || ty === 'GH') {
+    ctx.fillStyle = ty === 'HB' ? '#c62828' : '#00838f';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r, sy); ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r, sy);
+    ctx.closePath(); ctx.fill();
+  } else if (ty === 'LP' || ty === 'BT') {
+    ctx.fillStyle = ty === 'LP' ? '#245c9b' : '#d84315';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r, sy + r); ctx.lineTo(sx - r, sy + r);
+    ctx.closePath(); ctx.fill();
+  } else if (ty === 'LPC') {
+    ctx.fillStyle = '#2e7d32';
+    ctx.fillRect(sx - r + 1, sy - r + 1, 2 * r - 2, 2 * r - 2);
+  } else if (ty === 'PD') {
+    ctx.strokeStyle = '#e65100';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r, sy); ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r, sy);
+    ctx.closePath(); ctx.stroke();
+  } else if (ty === 'BP' || ty === 'CP') {
+    ctx.strokeStyle = '#6a1b9a';
+    ctx.beginPath(); ctx.arc(sx, sy, r - 0.5, 0, 2 * Math.PI); ctx.stroke();
+  } else {
+    ctx.fillStyle = theme.text || DEFAULT_PLOT_THEME.text;
+    ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 2 * Math.PI); ctx.fill();
+  }
+  const label = sp.label || sp.id || ty;
+  if (label) {
+    ctx.fillStyle = theme.text || DEFAULT_PLOT_THEME.text;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(label, sx + 6, sy - 4);
+  }
+  ctx.restore();
+}
+
+export function drawBifurcation1D(model, ctx, w, h, theme = DEFAULT_PLOT_THEME) {
+  const allBranches = model.get('bifurcation_branches') || [];
+  if (allBranches.length === 0) {
+    _drawBifurcationEmpty(ctx, w, h, theme, 'Run continuation to trace equilibria and limit cycles');
+    return;
+  }
+  const { xlim, ylim, param1, obsKey, obsLabel, branches, specialPoints } = bifurcation1DBounds(model);
+  if (branches.length === 0) {
+    _drawBifurcationEmpty(ctx, w, h, theme, 'Switch to 2D view to inspect 2-parameter curves');
+    return;
+  }
+  const bg = theme.background || theme.bg || DEFAULT_PLOT_THEME.background;
+  const accent = theme.accent || theme.cursor || '#245c9b';
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  drawAxes(ctx, w, h, xlim, ylim, param1, obsLabel, theme);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(42, 42, w - 84, h - 84);
+  ctx.clip();
+
+  const epStyle = (pt) => pt.stable === true
+    ? { key: 'ep-s', strokeStyle: accent, dash: [], lineWidth: 2 }
+    : { key: 'ep-u', strokeStyle: '#7f8c9a', dash: [6, 4], lineWidth: 1.75 };
+  const lcStyle = (pt) => pt.stable === true
+    ? { key: 'lc-s', strokeStyle: '#2e7d32', dash: [], lineWidth: 2.5 }
+    : { key: 'lc-u', strokeStyle: '#e65100', dash: [3, 3], lineWidth: 2 };
+
+  for (const br of branches) {
+    if (br.type === 'EP') {
+      _drawStyledCurve(ctx, br.points, xlim, ylim, w, h,
+        pt => [pt.p, bifurcationObservableValue(pt, obsKey, 'u')], epStyle);
+    } else if (br.type === 'LC') {
+      _drawStyledCurve(ctx, br.points, xlim, ylim, w, h,
+        pt => [pt.p, bifurcationObservableValue(pt, obsKey, 'u_max')], lcStyle);
+      _drawStyledCurve(ctx, br.points, xlim, ylim, w, h,
+        pt => [pt.p, bifurcationObservableValue(pt, obsKey, 'u_min')], lcStyle);
+    }
+  }
+
+  for (const sp of specialPoints) {
+    const wy = bifurcationObservableValue(sp, obsKey, 'u');
+    if (!Number.isFinite(sp.p) || !Number.isFinite(wy)) continue;
+    const [sx, sy] = worldToScreen(sp.p, wy, xlim, ylim, w, h);
+    _drawSpecialPointMarker(ctx, sx, sy, sp, theme);
+  }
+
+  const currentP = Number(model.get('params')?.[param1]);
+  if (Number.isFinite(currentP) && currentP >= xlim[0] && currentP <= xlim[1]) {
+    const [sx] = worldToScreen(currentP, ylim[0], xlim, ylim, w, h);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = theme.cursor || accent;
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.moveTo(sx, 42);
+    ctx.lineTo(sx, h - 42);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+export function drawBifurcation2D(model, ctx, w, h, theme = DEFAULT_PLOT_THEME) {
+  const { xlim, ylim, param1, param2, branches, specialPoints } = bifurcation2DBounds(model);
+  if (branches.length === 0) {
+    _drawBifurcationEmpty(ctx, w, h, theme, 'No 2D continuation curves yet');
+    return;
+  }
+  const bg = theme.background || theme.bg || DEFAULT_PLOT_THEME.background;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  drawAxes(ctx, w, h, xlim, ylim, param1, param2, theme);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(42, 42, w - 84, h - 84);
+  ctx.clip();
+
+  for (const br of branches) {
+    const color = br.type === 'HB2' ? '#c62828' : '#245c9b';
+    _drawStyledCurve(ctx, br.points, xlim, ylim, w, h,
+      pt => [pt.p, pt.p2], () => ({ key: br.type, strokeStyle: color, dash: [], lineWidth: 2 }));
+  }
+
+  for (const sp of specialPoints) {
+    if (!Number.isFinite(sp.p) || !Number.isFinite(sp.p2)) continue;
+    const [sx, sy] = worldToScreen(sp.p, sp.p2, xlim, ylim, w, h);
+    _drawSpecialPointMarker(ctx, sx, sy, sp, theme);
+  }
+
+  const params = model.get('params') || {};
+  const curP1 = Number(params[param1]), curP2 = Number(params[param2]);
+  if (Number.isFinite(curP1) && Number.isFinite(curP2)) {
+    const [sx, sy] = worldToScreen(curP1, curP2, xlim, ylim, w, h);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = theme.cursor || theme.accent || '#172d46';
+    ctx.lineWidth = 1.25;
+    if (curP1 >= xlim[0] && curP1 <= xlim[1]) {
+      ctx.beginPath(); ctx.moveTo(sx, 42); ctx.lineTo(sx, h - 42); ctx.stroke();
+    }
+    if (curP2 >= ylim[0] && curP2 <= ylim[1]) {
+      ctx.beginPath(); ctx.moveTo(42, sy); ctx.lineTo(w - 42, sy); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}

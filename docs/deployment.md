@@ -228,7 +228,23 @@ pdflatex phase_plane.tex
 - **Fixed points**: TikZ ``\node`` markers whose shapes encode stability (circle for nodes/foci, diamond for saddles; green for stable, red for unstable, purple for saddles).
 - **Parameter annotation**: a small ``\node`` in the top-left corner listing the current model name and parameter values.
 
-The widget UI also contains an **Export TikZ** button (beside the Export SVG button) that sends a message to the Python kernel for potential future integration.
+The widget UI also contains an **Export TikZ** button (beside the Export SVG and Export Bifurcation SVG buttons) that sends a message to the Python kernel for potential future integration.
+
+For bifurcation diagrams computed with AUTO2000 WASM, call:
+
+```python
+widget.export_bifurcation_tikz("bifurcation.tex")
+```
+
+This generates a standalone PGFPlots `.tex` file with solid/dashed equilibrium (`EP`) and limit-cycle (`LC`) curves and special-point labels (`LP`, `HB`, `PD`, etc.).
+
+### AUTO2000 WASM Continuation & Subpath Hosting
+
+The `bifurcation` panel (`panels=[..., "bifurcation"]`) and `presentation="bifurcation"` run AUTO2000 continuation in a Web Worker using `auto2000_core.wasm` and `auto2000-worker.js` (supporting 1D `EP`, `HB -> LC` branch switching, and 2D `LP`/`HB` continuation):
+
+- **Jupyter / anywidget**: assets are requested automatically over the comm channel (`request_auto_assets`).
+- **Standalone HTML**: pass `include_auto=True` to `widget.to_standalone_html("bifurcation.html", include_auto=True)` to embed the WASM binary and worker source inline.
+- **Static / subpath hosting** (e.g. MkDocs or GitHub Pages under `/tvb-docs/_static/trajecturtle/`): leave `include_auto=False` and set `auto_wasm_url` and `auto_worker_url` on the widget to point at the hosted `auto2000_core.wasm` and `auto2000-worker.js` URLs.
 
 ### References
 

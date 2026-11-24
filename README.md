@@ -13,7 +13,8 @@ Interactive phase plane widget for neural mass models, usable in Jupyter noteboo
 - **Click-to-set initial conditions** directly on the phase plane
 - **Real-time time series** display of all state variables
 - **Stochastic integration** — Stratonovich Heun with per-variable noise strength sliders
-- **Parameter sweeps** with bifurcation diagram visualization
+- **Parameter sweeps** with regime classification
+- **AUTO2000 WASM bifurcation continuation** — trace 1D equilibrium branches (`EP`), switch at Hopf points (`HB -> LC`) to trace stable/unstable limit cycles, and follow 2D `LP`/`HB` curves directly in a Web Worker
 - **Regime detection** — automatically classifies dynamics as fixed point, limit cycle, or other
 - **Custom models** — define arbitrary ODEs in Python (SymPy), compile to JavaScript via inlined Nerdamer CAS
 - **Standalone HTML** — fully self-contained exports (no server, no kernel)
@@ -100,7 +101,7 @@ display(widget.view(["time_series"]))
 ```
 
 Available panels: `model`, `parameters`, `projection`, `limits`, `noise`,
-`layers`, `editor`, `comparison`, `export`, `phase_plane`, `time_series`, `sweep`.
+`layers`, `editor`, `comparison`, `export`, `phase_plane`, `time_series`, `sweep`, `bifurcation`.
 Panels mount in the supplied order; unrequested panels are not instantiated.
 Use `panel_layout="vertical"` (or `layout="vertical"` on a view) to stack panels.
 Horizontal layouts automatically stack on narrow containers. Omitting panels
@@ -167,6 +168,24 @@ pp = phase_plane(
     integrator="heun",
     noise_per_var=[0.1, 0.05],
 )
+```
+
+### Bifurcation Continuation (AUTO2000 WASM)
+
+```python
+widget = PhasePlaneWidget(model_name="mpr", presentation="bifurcation")
+widget
+```
+
+After running continuation in the UI, `widget.bifurcation_branches` and
+`widget.bifurcation_special_points` are synced back to Python, and you can
+export a PGFPlots figure with `widget.export_bifurcation_tikz("bifurcation.tex")`.
+For offline HTML exports that include the AUTO2000 WASM worker, pass
+`include_auto=True` (or set `auto_wasm_url` / `auto_worker_url` when hosting
+the assets under a static subpath):
+
+```python
+widget.to_standalone_html("mpr_bifurcation.html", include_auto=True)
 ```
 
 ### Standalone HTML Export

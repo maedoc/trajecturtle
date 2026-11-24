@@ -21,14 +21,18 @@ Npm dependencies are only for DOM/browser testing.
 | Source | Responsibility |
 | --- | --- |
 | `engine.js` | Models, custom compilation and numerical algorithms |
+| `models-core.js` | Shared model definitions for main thread and AUTO2000 Web Worker |
 | `experiment.js` | Derived-state caches and first-mount reset/reference identities |
-| `controller.js` | One controller per canonical model: input subscriptions, computation, playback and asynchronous sweeps |
+| `controller.js` | One controller per canonical model: input subscriptions, computation, playback, sweeps and bifurcation continuation |
+| `auto-client.js` | Web Worker lifecycle, WASM asset loading and cancellation for AUTO2000 |
+| `auto-worker.js` | Dedicated worker executing AUTO2000 WASM continuation (built into `static/auto2000-worker.js`) |
 | `components.js` | DOM scopes, numeric controls, cleanup, responsive/high-DPI canvas surfaces |
 | `control-panels.js` | Model, parameters, projection, limits, noise, layers, comparison and export |
 | `plot-panels.js` | Phase plane, time series/playback and sweep interface |
+| `bifurcation-panel.js` | AUTO2000 1D/2D bifurcation continuation panel and special-point chips |
 | `editor-panel.js` | Debounced equation editor and validation |
-| `plot-drawing.js` | DOM-independent canvas/SVG drawing, including frozen scenes |
-| `presentations.js` | Experimental figure, bench, drawer, comparison lens and lesson compositions |
+| `plot-drawing.js` | DOM-independent canvas/SVG drawing, including frozen scenes and 1D/2D bifurcation diagrams |
+| `presentations.js` | Experimental figure, bench, drawer, comparison lens, lesson and bifurcation compositions |
 | `coordinates.js` | Plot coordinate transforms, axes and arrows |
 | `view.js` | Resolve shared model, select/order factories, subscribe/update and dispose |
 

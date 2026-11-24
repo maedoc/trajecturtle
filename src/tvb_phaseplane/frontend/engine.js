@@ -1,285 +1,3 @@
-function _sigmoid(x, k, theta) {
-  return 1.0 / (1.0 + expClamp(-k * (x - theta)));
-}
-
-const MODELS = {
-  wilson_cowan: {
-    dim: 2,
-    stateNames: ["E", "I"],
-    stateVars: ["E", "I"],
-    display: [0, 1],
-    defaultParams: {
-      aee: 10.0, aei: 10.0, aie: 10.0, aii: 2.0,
-      Pe: -2.0, Pi: -8.0,
-      ke: 1.0, ki: 1.0,
-      thetae: 4.0, thetai: 4.0,
-    },
-    paramInfo: {
-      aee: [0.0, 20.0, 10.0, "E→E coupling"],
-      aei: [0.0, 20.0, 10.0, "I→E coupling"],
-      aie: [0.0, 20.0, 10.0, "E→I coupling"],
-      aii: [0.0, 20.0, 2.0, "I→I coupling"],
-      Pe: [-10.0, 10.0, -2.0, "External E input"],
-      Pi: [-10.0, 10.0, -8.0, "External I input"],
-      ke: [0.1, 5.0, 1.0, "E sigmoid gain"],
-      ki: [0.1, 5.0, 1.0, "I sigmoid gain"],
-      thetae: [0.0, 10.0, 4.0, "E sigmoid threshold"],
-      thetai: [0.0, 10.0, 4.0, "I sigmoid threshold"],
-    },
-    defaultXlim: [-0.2, 1.2],
-    defaultYlim: [-0.2, 1.2],
-    defaultLims: [[-0.2, 1.2], [-0.2, 1.2]],
-    f: (_t, [E, I], p) => {
-      const Se = (x) => _sigmoid(x, p.ke, p.thetae);
-      const Si = (x) => _sigmoid(x, p.ki, p.thetai);
-      return [
-        -E + Se(p.aee * E - p.aei * I + p.Pe),
-        -I + Si(p.aie * E - p.aii * I + p.Pi),
-      ];
-    },
-  },
-
-  fitzhugh_nagumo: {
-    dim: 2,
-    stateNames: ["v", "w"],
-    stateVars: ["v", "w"],
-    display: [0, 1],
-    defaultParams: { a: 0.7, b: 0.8, epsilon: 0.08, I: 0.5 },
-    paramInfo: {
-      a: [-1.0, 2.0, 0.7, "Recovery offset"],
-      b: [0.0, 2.0, 0.8, "Recovery gain"],
-      epsilon: [0.001, 1.0, 0.08, "Time scale (ε)"],
-      I: [-2.0, 2.0, 0.5, "External current"],
-    },
-    defaultXlim: [-3.0, 3.0],
-    defaultYlim: [-1.5, 2.0],
-    defaultLims: [[-3.0, 3.0], [-1.5, 2.0]],
-    f: (_t, [v, w], p) => [
-      v - (v * v * v) / 3.0 - w + p.I,
-      p.epsilon * (v + p.a - p.b * w),
-    ],
-  },
-
-  mpr: {
-    dim: 2,
-    stateNames: ["r", "v"],
-    stateVars: ["r", "v"],
-    display: [0, 1],
-    defaultParams: { delta: 1.0, eta_bar: -5.0, J: 15.0, I: 0.0 },
-    paramInfo: {
-      delta: [0.01, 5.0, 1.0, "Lorentzian half-width Δ"],
-      eta_bar: [-20.0, 10.0, -5.0, "Mean excitability η̄"],
-      J: [-20.0, 30.0, 15.0, "Synaptic coupling J"],
-      I: [-10.0, 10.0, 0.0, "External input I"],
-    },
-    defaultXlim: [0.0, 2.0],
-    defaultYlim: [-4.0, 2.0],
-    defaultLims: [[0.0, 2.0], [-4.0, 2.0]],
-    f: (_t, [r, v], p) => {
-      const r_eff = Math.max(r, 1e-10);
-      const dr = p.delta / Math.PI + 2.0 * r_eff * v;
-      const dv = v * v + p.eta_bar + p.J * r_eff + p.I - (Math.PI * r_eff) ** 2;
-      return [dr, dv];
-    },
-  },
-
-  hindmarsh_rose: {
-    dim: 3,
-    stateNames: ["x", "y", "z"],
-    stateVars: ["x", "y", "z"],
-    display: [0, 1],
-    defaultParams: { a: 1.0, b: 3.0, c: 1.0, d: 5.0, I: 3.0, r: 0.001, s: 4.0, x_r: -1.6 },
-    paramInfo: {
-      a: [0.5, 2.0, 1.0, "Cubic coefficient a"],
-      b: [1.0, 5.0, 3.0, "Quadratic coefficient b"],
-      c: [0.0, 2.0, 1.0, "Constant drive c"],
-      d: [1.0, 10.0, 5.0, "Quadratic loss d"],
-      I: [-2.0, 6.0, 3.0, "Applied current I"],
-      r: [0.0001, 0.01, 0.001, "Slow time scale r"],
-      s: [1.0, 8.0, 4.0, "Slow gain s"],
-      x_r: [-3.0, 0.0, -1.6, "Resting offset x_r"],
-    },
-    defaultXlim: [-3.0, 3.0],
-    defaultYlim: [-20.0, 10.0],
-    defaultLims: [[-3.0, 3.0], [-20.0, 10.0], [-1.0, 3.5]],
-    f: (_t, [x, y, z], p) => {
-      const dx = y - p.a * x * x * x + p.b * x * x - z + p.I;
-      const dy = p.c - p.d * x * x - y;
-      const dz = p.r * (p.s * (x - p.x_r) - z);
-      return [dx, dy, dz];
-    },
-  },
-};
-
-// ═══════════════════════════════════════════════════════════════
-//  CUSTOM MODEL COMPILATION (nerdamer-powered)
-// ═══════════════════════════════════════════════════════════════
-
-/** Topological sort of custom functions based on dependency graph.
- *
- *  @param {Object} cfDict - {name: {vars: [...], expr: "..."}}
- *  @returns {Array} [[name, vars, exprStr], ...] in dependency order
- */
-function sortCustomFunctions(cfDict) {
-  if (!cfDict || Object.keys(cfDict).length === 0) return [];
-  const names = Object.keys(cfDict);
-  const visited = {};
-  const ordered = [];
-
-  function visit(name, path) {
-    if (visited[name]) return;
-    if (path.has(name)) {
-      console.warn('Circular dependency in custom_functions involving', name);
-      return;
-    }
-    path.add(name);
-    const entry = cfDict[name];
-    const exprStr = entry.expr || entry;
-    for (const other of names) {
-      if (other === name) continue;
-      if (exprStr.includes(other)) {
-        visit(other, path);
-      }
-    }
-    visited[name] = true;
-    ordered.push([name, entry.vars || [], exprStr]);
-    path.delete(name);
-  }
-
-  for (const name of names) {
-    if (!visited[name]) visit(name, new Set());
-  }
-  return ordered;
-}
-
-let _builtinMathRegistered = false;
-/** Register safe_exp, step, and rww_H in nerdamer's parser and Math2 compiler scope. */
-function registerBuiltinMathHelpers() {
-  if (_builtinMathRegistered || typeof nerdamer === 'undefined') return;
-  const core = nerdamer.getCore();
-  core.Math2.safe_exp = function safe_exp(x) {
-    return Math.exp(Math.max(-709, Math.min(709, x)));
-  };
-  core.Math2.step = function step(x) {
-    return x >= 0 ? 1 : 0;
-  };
-  core.Math2.rww_H = function rww_H(x, d) {
-    return Math.abs(d * x) < 1e-7
-      ? 1 / d
-      : x / (1 - Math.exp(Math.max(-709, Math.min(709, -d * x))));
-  };
-  const wrap = (name) => (...args) => {
-    const flat = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
-    return core.PARSER.symfunction(name, flat);
-  };
-  core.PARSER.functions.safe_exp = [wrap('safe_exp'), 1];
-  core.PARSER.functions.step = [wrap('step'), 1];
-  core.PARSER.functions.rww_H = [wrap('rww_H'), [1, 2]];
-  _builtinMathRegistered = true;
-}
-
-/** Register custom functions with nerdamer in topological order.
- *
- *  @param {Object} cfDict - {name: {vars: [...], expr: "..."}}
- */
-function registerCustomFunctions(cfDict) {
-  registerBuiltinMathHelpers();
-  if (!cfDict || Object.keys(cfDict).length === 0) return;
-  const ordered = sortCustomFunctions(cfDict);
-  for (const [name, vars, body] of ordered) {
-    try {
-      nerdamer.setFunction(name, vars, body);
-    } catch (e) {
-      console.warn('Failed to register custom function', name, e);
-    }
-  }
-}
-
-/** Compile a model_spec dict into a MODELS-compatible entry.
- *
- *  @param {Object} spec - model_spec dict from Python
- *  @returns {Object} modelEntry with same shape as MODELS entries
- */
-function compileModelSpec(spec) {
-  if (!spec || !spec.equations || Object.keys(spec.equations).length === 0) {
-    throw new Error('compileModelSpec: invalid or empty spec: ' + JSON.stringify(spec));
-  }
-
-  registerCustomFunctions(spec.custom_functions);
-
-  const stateVars = Object.keys(spec.state_vars);
-  const paramNames = Object.keys(spec.parameters || {});
-  const dim = stateVars.length;
-  const allArgNames = [...stateVars, ...paramNames];
-
-  // Compile each equation
-  const compiledEqs = {};
-  const rawExprs = {};
-  for (const name of stateVars) {
-    const exprStr = spec.equations[name];
-    rawExprs[name] = exprStr || '0';
-    if (exprStr === undefined || exprStr === null) {
-      compiledEqs[name] = () => 0;
-      continue;
-    }
-    try {
-      compiledEqs[name] = nerdamer(exprStr).buildFunction(allArgNames);
-    } catch (e) {
-      throw new Error(`Cannot compile equation for ${name}: ${e.message}`);
-    }
-  }
-
-  // Full N-dimensional RHS
-  function f(t, state, params) {
-    const args = [];
-    for (let i = 0; i < dim; i++) args.push(state[i]);
-    for (const pn of paramNames) args.push(params[pn] !== undefined ? params[pn] : 0);
-    const result = [];
-    for (const name of stateVars) result.push(compiledEqs[name](...args));
-    return result;
-  }
-
-  const display = spec.display || [0, Math.min(1, dim - 1)];
-  const defaultParams = {};
-  const paramInfo = {};
-  if (spec.parameters) {
-    for (const [name, info] of Object.entries(spec.parameters)) {
-      defaultParams[name] = info.default;
-      paramInfo[name] = [info.range[0], info.range[1], info.default, 'Parameter ' + name];
-    }
-  }
-
-  const defaultLims = stateVars.map((name) => {
-    const sv = spec.state_vars[name];
-    return sv && sv.range ? [...sv.range] : [-5, 5];
-  });
-  const bounds = stateVars.map((name) => {
-    const b = spec.state_vars[name]?.bounds ?? spec.bounds?.[name];
-    return Array.isArray(b) && b.length === 2 ? [b[0], b[1]] : null;
-  });
-  const hasBounds = bounds.some((b) => b !== null);
-  const defaultXlim = defaultLims[display[0]] || [-5, 5];
-  const defaultYlim = display.length > 1 ? (defaultLims[display[1]] || [-5, 5]) : [-5, 5];
-
-  return {
-    dim,
-    stateNames: stateVars,
-    stateVars,
-    display,
-    defaultParams,
-    paramInfo,
-    defaultXlim: [...defaultXlim],
-    defaultYlim: [...defaultYlim],
-    defaultLims: defaultLims.map((l) => [...l]),
-    bounds: hasBounds ? bounds : null,
-    f,
-    _compiledEqs: compiledEqs,
-    _rawExprs: rawExprs,
-    _allArgNames: allArgNames,
-    _paramNames: paramNames,
-  };
-}
-
 /** Create a projected RHS for the 2D phase plane using nerdamer compilation.
  *
  *  Non-displayed state variables are substituted as literal numbers.
@@ -365,13 +83,6 @@ function linspace(a, b, n) {
  *  @param {number[]} clamped — full N-dim state vector with clamped values
  *  @returns {Function} f_proj(t, projState, params) → derivatives of displayed vars
  */
-function resolveModel(modelName, spec) {
-  if (modelName === 'custom') return compileModelSpec(spec);
-  const def = MODELS[modelName];
-  if (!def) throw new Error('Unknown model: ' + modelName);
-  return def;
-}
-
 function makeProjectedRHS(modelName, displayIdx, clamped, spec = null, resolved = null) {
   const def = resolved || resolveModel(modelName, spec);
   if (modelName === 'custom') return makeCompiledProjectedRHS(def, displayIdx, clamped);
@@ -995,6 +706,208 @@ function runParameterSweep(f, modelName, sweepParam, params, vmin, vmax, n, xlim
     for (const fp of fps) allFps.push([val, fp[0], fp[1], fp[2]]);
   }
   return { results, allFps };
+}
+
+/** Solve N×N linear system A * x = b using Gaussian elimination with partial pivoting.
+ *  Returns solution vector x, or null if A is singular or dimensions are invalid. */
+export function solveLinearSystem(A, b) {
+  const n = Array.isArray(A) ? A.length : 0;
+  if (n < 1 || !Array.isArray(b) || b.length !== n) return null;
+
+  const M = A.map((row) => row.slice());
+  const rhs = b.slice();
+
+  for (let col = 0; col < n; col++) {
+    let pivotRow = col;
+    let pivotAbs = Math.abs(M[col][col]);
+    for (let row = col + 1; row < n; row++) {
+      const val = Math.abs(M[row][col]);
+      if (val > pivotAbs) {
+        pivotAbs = val;
+        pivotRow = row;
+      }
+    }
+    if (!Number.isFinite(pivotAbs) || pivotAbs < 1e-14) return null;
+
+    if (pivotRow !== col) {
+      [M[col], M[pivotRow]] = [M[pivotRow], M[col]];
+      [rhs[col], rhs[pivotRow]] = [rhs[pivotRow], rhs[col]];
+    }
+
+    const diag = M[col][col];
+    for (let row = col + 1; row < n; row++) {
+      const factor = M[row][col] / diag;
+      if (factor === 0) continue;
+      M[row][col] = 0;
+      for (let k = col + 1; k < n; k++) {
+        M[row][k] -= factor * M[col][k];
+      }
+      rhs[row] -= factor * rhs[col];
+    }
+  }
+
+  const x = new Array(n).fill(0);
+  for (let row = n - 1; row >= 0; row--) {
+    let sum = rhs[row];
+    for (let k = row + 1; k < n; k++) {
+      sum -= M[row][k] * x[k];
+    }
+    const val = sum / M[row][row];
+    if (!Number.isFinite(val)) return null;
+    x[row] = val;
+  }
+  return x;
+}
+
+function _vectorNorm(vec) {
+  let sum = 0;
+  for (let i = 0; i < vec.length; i++) {
+    const v = vec[i];
+    if (!Number.isFinite(v)) return Infinity;
+    sum += v * v;
+  }
+  return Math.sqrt(sum);
+}
+
+function _newtonPolishND(def, params, startState, tol, maxIter, eps) {
+  let u = def.bounds ? clampState([...startState], def.bounds) : [...startState];
+  if (u.some((v) => !Number.isFinite(v))) {
+    return { u: [...startState], residual: Infinity, converged: false };
+  }
+  let f0 = def.f(0, u, params);
+  let res0 = _vectorNorm(f0);
+  if (!Number.isFinite(res0)) {
+    return { u, residual: Infinity, converged: false };
+  }
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    if (res0 < tol) {
+      return { u, residual: res0, converged: true };
+    }
+    const J = jacobianND(def.f, u, params, eps);
+    const delta = solveLinearSystem(J, f0.map((v) => -v));
+    if (!delta) break;
+
+    let accepted = false;
+    for (const alpha of [1, 0.5, 0.25, 0.125, 0.0625]) {
+      let cand = u.map((ui, i) => ui + alpha * delta[i]);
+      if (def.bounds) cand = clampState(cand, def.bounds);
+      const fCand = def.f(0, cand, params);
+      const resCand = _vectorNorm(fCand);
+      if (Number.isFinite(resCand) && resCand < res0) {
+        u = cand;
+        f0 = fCand;
+        res0 = resCand;
+        accepted = true;
+        break;
+      }
+    }
+    if (!accepted) break;
+  }
+
+  return { u, residual: res0, converged: res0 < tol };
+}
+
+/** Find a full-N-D steady state of def.f(0, u, params) = 0 using damped Newton-Raphson,
+ *  falling back to deterministic RK4 burn-in and alternative seeds if needed. */
+export function findSteadyStateND(def, params, seedState, opts = {}) {
+  const tol = opts.tol ?? 1e-8;
+  const maxIter = opts.maxIter ?? 40;
+  const eps = opts.eps ?? 1e-6;
+  const burnInT = opts.burnInT ?? 40;
+  const burnInDt = opts.burnInDt ?? 0.05;
+  const dim = def.dim ?? seedState?.length ?? def.defaultLims?.length ?? 2;
+
+  const midpoint = Array.from({ length: dim }, (_, i) => {
+    const lim = def.defaultLims?.[i];
+    return Array.isArray(lim) && lim.length === 2 ? (lim[0] + lim[1]) / 2 : 0;
+  });
+
+  const candidates = [];
+  if (Array.isArray(seedState) && seedState.length === dim) {
+    candidates.push([...seedState]);
+  }
+  if (Array.isArray(opts.fallbackStates)) {
+    for (const fb of opts.fallbackStates) {
+      if (Array.isArray(fb) && fb.length === dim) {
+        candidates.push([...fb]);
+      }
+    }
+  }
+  candidates.push(midpoint);
+
+  let best = { u: [...candidates[0]], residual: Infinity, converged: false };
+  const updateBest = (res) => {
+    if (Number.isFinite(res.residual) && res.residual < best.residual) {
+      best = res;
+    }
+  };
+
+  // Pass 1: direct damped Newton from primary seed
+  const primaryRes = _newtonPolishND(def, params, candidates[0], tol, maxIter, eps);
+  updateBest(primaryRes);
+  if (primaryRes.converged) return primaryRes;
+
+  // Pass 2: RK4 burn-in from primary seed, then Newton polish
+  const primaryBurn = rk4(def, candidates[0], 0, burnInT, burnInDt, params);
+  if (primaryBurn.length > 1) {
+    const burnedState = primaryBurn[primaryBurn.length - 1].slice(1);
+    const burnedRes = _newtonPolishND(def, params, burnedState, tol, maxIter, eps);
+    updateBest(burnedRes);
+    if (burnedRes.converged) return burnedRes;
+  }
+
+  // Pass 3: fallback seeds (direct Newton, then RK4 burn-in + Newton)
+  for (let i = 1; i < candidates.length; i++) {
+    const cand = candidates[i];
+    const directRes = _newtonPolishND(def, params, cand, tol, maxIter, eps);
+    updateBest(directRes);
+    if (directRes.converged) return directRes;
+
+    const burn = rk4(def, cand, 0, burnInT, burnInDt, params);
+    if (burn.length > 1) {
+      const burnedState = burn[burn.length - 1].slice(1);
+      const burnedRes = _newtonPolishND(def, params, burnedState, tol, maxIter, eps);
+      updateBest(burnedRes);
+      if (burnedRes.converged) return burnedRes;
+    }
+  }
+
+  return best;
+}
+
+/** Detect non-smooth functions in a custom model_spec that can hinder numerical continuation. */
+export function detectNonSmoothExpressions(model_spec) {
+  if (!model_spec || typeof model_spec !== 'object') return [];
+  const pattern = /\b(step|heaviside|abs|min|max|sign)\s*\(/gi;
+  const found = new Set();
+
+  const scanText = (text) => {
+    if (typeof text !== 'string') return;
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      found.add(`${match[1]}(`);
+    }
+  };
+
+  const scanContainer = (container) => {
+    if (!container || typeof container !== 'object') return;
+    for (const val of Object.values(container)) {
+      if (typeof val === 'string') {
+        scanText(val);
+      } else if (val && typeof val === 'object') {
+        scanText(val.body);
+        scanText(val.expr);
+        scanText(val.expression);
+      }
+    }
+  };
+
+  scanContainer(model_spec.equations);
+  scanContainer(model_spec.functions);
+  scanContainer(model_spec.custom_functions);
+  return [...found];
 }
 
 // ═══════════════════════════════════════════════════════════════

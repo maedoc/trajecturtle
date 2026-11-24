@@ -2,6 +2,143 @@
 const EXPERIMENT_CONTROLLER = Symbol.for('trajecturtle.experiment-controller');
 const COMPUTATION_INPUTS = ['model_spec', 'model_name', 'params', 'state_names', 'display', 'clamped', 'x0', 'y0', 'xlim', 'ylim', 't_max', 'dt', 'integrator', 'noise_enable', 'noise_sigma', 'noise_seed'];
 const PRESENTATION_INPUTS = ['param_info', 'show_nullclines', 'show_vector_field', 'show_trajectory', 'show_fixed_points', 'trajectory_fraction', 'reference_trajectory', 'reference_scene', 'show_reference', 'reference_metadata', 'sweep_results', 'sweep_fixed_points', 'sweep_param', 'initial_conditions', 'observation_cards'];
+const BIFURCATION_INPUTS = ['bifurcation_branches', 'bifurcation_special_points', 'bifurcation_config', 'bifurcation_running', 'bifurcation_metadata', 'bifurcation_presets'];
+
+function _bifurcationModelIdentity(model) {
+  return JSON.stringify([
+    model.get('model_name'),
+    model.get('model_spec') || null,
+    model.get('state_names') || [],
+  ]);
+}
+
+function _bifurcationFixedParamsIdentity(model, activeParams) {
+  const params = model.get('params') || {};
+  const active = new Set(activeParams || []);
+  const entries = Object.keys(params)
+    .filter((k) => !active.has(k))
+    .sort()
+    .map((k) => [k, params[k]]);
+  return JSON.stringify(entries);
+}
+
+function _resolveBifurcationRange(def, model, paramName, explicitRange, rl0, rl1, currentVal) {
+  if (Array.isArray(explicitRange) && explicitRange.length === 2 &&
+      Number.isFinite(explicitRange[0]) && Number.isFinite(explicitRange[1])) {
+    return explicitRange[0] <= explicitRange[1]
+      ? [explicitRange[0], explicitRange[1]]
+      : [explicitRange[1], explicitRange[0]];
+  }
+  if (Number.isFinite(rl0) && Number.isFinite(rl1)) {
+    return rl0 <= rl1 ? [rl0, rl1] : [rl1, rl0];
+  }
+  const info = def.paramInfo?.[paramName] ?? model.get('param_info')?.[paramName];
+  if (Array.isArray(info) && info.length >= 2 && Number.isFinite(info[0]) && Number.isFinite(info[1])) {
+    return info[0] <= info[1] ? [info[0], info[1]] : [info[1], info[0]];
+  }
+  const v = Number.isFinite(currentVal) ? currentVal : 0;
+  return [v - 1, v + 1];
+}
+
+function _buildSeedCandidates(def, model) {
+  const dim = def.dim || (model.get('state_names') || []).length || 2;
+  const display = model.get('display') || def.display || [0, 1];
+  const clamped = model.get('clamped') || [];
+  const base = Array.from({ length: dim }, (_, i) => {
+    if (Number.isFinite(clamped[i])) return clamped[i];
+    const lim = def.defaultLims?.[i];
+    return Array.isArray(lim) && lim.length === 2 ? (lim[0] + lim[1]) / 2 : 0;
+  });
+
+  const primary = [...base];
+  const x0 = model.get('x0');
+  const y0 = model.get('y0');
+  if (Number.isFinite(x0) && display[0] < dim) primary[display[0]] = x0;
+  if (display.length > 1 && Number.isFinite(y0) && display[1] < dim) primary[display[1]] = y0;
+
+  const fallbacks = [];
+  const traj = model.get('trajectory') || [];
+  if (traj.length > 0 && Array.isArray(traj[traj.length - 1]) && traj[traj.length - 1].length >= dim + 1) {
+    fallbacks.push(traj[traj.length - 1].slice(1, 1 + dim));
+  }
+  const fps = model.get('fixed_points') || [];
+  for (const fp of fps) {
+    if (!Array.isArray(fp) || fp.length < 2) continue;
+    const fb = [...base];
+    if (display[0] < dim) fb[display[0]] = fp[0];
+    if (display.length > 1 && display[1] < dim) fb[display[1]] = fp[1];
+    fallbacks.push(fb);
+  }
+  return { primary, fallbacks };
+}
+
+function _stitchBidirectionalBranch(backwardPts, forwardPts) {
+  const back = [...(backwardPts || [])].reverse();
+  const fwd = [...(forwardPts || [])];
+  if (back.length > 0 && fwd.length > 0) {
+    const last = back[back.length - 1];
+    const first = fwd[0];
+    const sameP = Math.abs((last.p ?? 0) - (first.p ?? 0)) < 1e-8 &&
+      Math.abs((last.p2 ?? 0) - (first.p2 ?? 0)) < 1e-8;
+    const uA = last.u || [];
+    const uB = first.u || [];
+    const sameU = uA.length === uB.length && uA.every((v, i) => Math.abs(v - uB[i]) < 1e-6);
+    if (sameP && sameU) fwd.shift();
+  }
+  return [...back, ...fwd];
+}
+
+function _nextBranchId(prefix, existingBranches) {
+  let maxNum = 0;
+  const re = new RegExp(`^${prefix}_(\\d+)$`);
+  for (const br of existingBranches || []) {
+    const m = re.exec(br?.id || '');
+    if (m) maxNum = Math.max(maxNum, Number(m[1]));
+  }
+  return `${prefix}_${maxNum + 1}`;
+}
+
+function _registerSpecialPoints(rawSpecialPoints, branchId, param1, param2, existingSps, restartCache) {
+  const counts = {};
+  for (const sp of existingSps || []) {
+    if (sp?.ty) counts[sp.ty] = (counts[sp.ty] || 0) + 1;
+  }
+  const added = [];
+  for (const sp of rawSpecialPoints || []) {
+    if (!sp || !sp.ty || sp.ty === 'EP' || sp.ty === 'UZ') continue;
+    counts[sp.ty] = (counts[sp.ty] || 0) + 1;
+    const id = `${sp.ty}${counts[sp.ty]}`;
+    const entry = {
+      id,
+      label: id,
+      ty: sp.ty,
+      lab: sp.lab,
+      p: sp.p,
+      u: Array.isArray(sp.u) ? [...sp.u] : [],
+      branch_id: branchId,
+      param1,
+      param2: param2 ?? null,
+      can_switch_lc: sp.ty === 'HB',
+      can_trace_2d: sp.ty === 'LP' || sp.ty === 'HB',
+      ...(sp.period !== undefined ? { period: sp.period } : {}),
+      ...(sp.p2 !== undefined ? { p2: sp.p2 } : {}),
+    };
+    added.push(entry);
+    restartCache.set(id, {
+      ...(sp.restartSp || {}),
+      ty: sp.ty,
+      lab: sp.lab,
+      p: sp.p,
+      p2: sp.p2,
+      u: entry.u,
+      param1,
+      param2: param2 ?? null,
+      branch_id: branchId,
+      restartSp: sp.restartSp || null,
+    });
+  }
+  return added;
+}
 
 export function acquireExperiment(model) {
   const controller = model[EXPERIMENT_CONTROLLER] ||= createExperimentController(model);
@@ -14,8 +151,37 @@ function createExperimentController(model) {
   const listeners = [];
   let references = 0, pending = null, computing = false, disposed = false;
   let sweepJob = null, playback = null;
+  let autoClient = null, bifurcationJob = null, bifurcationGeneration = 0;
+  function _getAutoClient() {
+    if (!autoClient) autoClient = createAutoClient(model);
+    return autoClient;
+  }
+  function _isBifurcationJobActive(job) {
+    return !disposed && job && !job.cancelled && bifurcationJob === job && bifurcationGeneration === job.id;
+  }
+  function _beginBifurcationJob(owner, modelIdentity) {
+    if (bifurcationJob) controller.cancelBifurcation();
+    bifurcationGeneration++;
+    const job = { id: bifurcationGeneration, owner, modelIdentity, cancelled: false };
+    bifurcationJob = job;
+    model.set('bifurcation_running', true);
+    const meta = model.get('bifurcation_metadata') || {};
+    model.set('bifurcation_metadata', { ...meta, status: 'running', error: null });
+    emit(); sync();
+    return job;
+  }
+  function _failBifurcationJob(job, message) {
+    if (!_isBifurcationJobActive(job)) return null;
+    bifurcationJob = null;
+    model.set('bifurcation_running', false);
+    const meta = model.get('bifurcation_metadata') || {};
+    model.set('bifurcation_metadata', { ...meta, status: 'error', error: message });
+    emit(); sync();
+    return null;
+  }
   const controller = {
     model, error: null, sweep: { progress: 0, status: '' },
+    restartCache: new Map(),
     get playing() { return !!playback; },
     retain() { references++; },
     subscribe(callback) { subscribers.add(callback); return () => subscribers.delete(callback); },
@@ -23,6 +189,7 @@ function createExperimentController(model) {
       if (--references > 0) return;
       clearTimeout(pending);
       controller.cancelSweep();
+      controller.cancelBifurcation();
       controller.pause();
       disposed = true;
       for (const [event, callback] of listeners) model.off(event, callback);
@@ -49,10 +216,28 @@ function createExperimentController(model) {
           model.set('sweep_metadata', {});
           controller.sweep.status = 'Configuration changed — run sweep again';
         }
+        const modelIdentity = _bifurcationModelIdentity(model);
+        const bifMeta = model.get('bifurcation_metadata') || {};
+        const bifBranches = model.get('bifurcation_branches') || [];
+        if (bifurcationJob && bifurcationJob.modelIdentity !== modelIdentity) {
+          controller.clearBifurcation();
+        } else if (bifBranches.length > 0) {
+          if (bifMeta.model_identity && bifMeta.model_identity !== modelIdentity) {
+            controller.clearBifurcation();
+          } else if (bifMeta.fixed_params_identity) {
+            const fixedId = _bifurcationFixedParamsIdentity(model, bifMeta.active_params);
+            if (fixedId !== bifMeta.fixed_params_identity) {
+              if (!bifMeta.stale) model.set('bifurcation_metadata', { ...bifMeta, stale: true });
+            } else if (bifMeta.stale) {
+              model.set('bifurcation_metadata', { ...bifMeta, stale: false });
+            }
+          }
+        }
       } catch (error) {
         controller.definition = null;
         controller.error = error;
         controller.cancelSweep();
+        controller.cancelBifurcation();
         model.set('sweep_results', []); model.set('sweep_fixed_points', []);
       } finally {
         computing = false;
@@ -60,7 +245,7 @@ function createExperimentController(model) {
       emit(); sync();
     },
     reset() {
-      controller.pause(); controller.cancelSweep();
+      controller.pause(); controller.cancelSweep(); controller.cancelBifurcation();
       controller.sweep = { progress: 0, status: '' };
       resetExperiment(model);
       controller.refresh();
@@ -179,6 +364,351 @@ function createExperimentController(model) {
         step();
       } catch (error) { fail(error); }
     },
+    cancelBifurcation(owner = null) {
+      if (!bifurcationJob || (owner && bifurcationJob.owner !== owner)) return;
+      bifurcationGeneration++;
+      bifurcationJob.cancelled = true;
+      bifurcationJob = null;
+      autoClient?.cancel();
+      model.set('bifurcation_running', false);
+      const meta = model.get('bifurcation_metadata') || {};
+      model.set('bifurcation_metadata', { ...meta, status: 'cancelled' });
+      emit(); sync();
+    },
+    clearBifurcation() {
+      if (bifurcationJob) controller.cancelBifurcation();
+      controller.restartCache.clear();
+      model.set('bifurcation_branches', []);
+      model.set('bifurcation_special_points', []);
+      model.set('bifurcation_running', false);
+      model.set('bifurcation_metadata', {});
+      emit(); sync();
+    },
+    async startEquilibriumContinuation(config = {}, owner = null) {
+      const modelName = model.get('model_name');
+      const modelSpec = model.get('model_spec');
+      const modelIdentity = _bifurcationModelIdentity(model);
+      const job = _beginBifurcationJob(owner, modelIdentity);
+      try {
+        const def = resolveModel(modelName, modelSpec);
+        const params = { ...(def.defaultParams || {}), ...(model.get('params') || {}) };
+        const cfg = { ...(model.get('bifurcation_config') || {}), ...config };
+        const param1 = cfg.param1 || cfg.parameter || Object.keys(def.defaultParams || {})[0];
+        if (!param1) {
+          return _failBifurcationJob(job, 'No continuation parameter available for this model');
+        }
+        const [rl0, rl1] = _resolveBifurcationRange(def, model, param1, cfg.range, cfg.rl0, cfg.rl1, params[param1]);
+        const { primary, fallbacks } = _buildSeedCandidates(def, model);
+        const seed = findSteadyStateND(def, params, primary, { fallbackStates: fallbacks });
+        if (!seed.converged) {
+          return _failBifurcationJob(
+            job,
+            `Failed to locate a steady state for continuation (residual ${seed.residual.toExponential(2)})`,
+          );
+        }
+
+        const nonSmoothTokens = modelName === 'custom' ? detectNonSmoothExpressions(modelSpec) : [];
+        const absDs = Math.abs(cfg.ds ?? 0.05) || 0.05;
+        const p0Val = Number(params[param1] ?? 0);
+        const contBase = {
+          ips: 1,
+          isw: 1,
+          activeParams: [param1],
+          rl0,
+          rl1,
+          dsmin: cfg.dsmin ?? 1e-4,
+          dsmax: cfg.dsmax ?? 0.2,
+          nmx: cfg.nmx ?? 200,
+          npr: cfg.npr ?? 200,
+          ilp: cfg.ilp ?? 1,
+          isp: cfg.isp ?? 2,
+          stpnt: { u: seed.u, par: [p0Val] },
+        };
+        const modelPayload = { model_name: modelName, model_spec: modelSpec, params };
+        const client = _getAutoClient();
+
+        const fwdRes = await client.run({
+          model: modelPayload,
+          continuation: { ...contBase, ds: absDs },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const bwdRes = await client.run({
+          model: modelPayload,
+          continuation: { ...contBase, ds: -absDs },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const existingBranches = model.get('bifurcation_branches') || [];
+        const existingSps = model.get('bifurcation_special_points') || [];
+        const branchId = _nextBranchId('ep', existingBranches);
+        const stitchedPoints = _stitchBidirectionalBranch(bwdRes.branch, fwdRes.branch);
+        const branch = {
+          id: branchId,
+          type: 'EP',
+          param1,
+          param2: null,
+          points: stitchedPoints,
+        };
+
+        const rawSps = [...(bwdRes.specialPoints || []), ...(fwdRes.specialPoints || [])];
+        const addedSps = _registerSpecialPoints(rawSps, branchId, param1, null, existingSps, controller.restartCache);
+
+        const prevMeta = model.get('bifurcation_metadata') || {};
+        const activeParams = [...new Set([...(prevMeta.active_params || []), param1])];
+        model.set('bifurcation_branches', [...existingBranches, branch]);
+        model.set('bifurcation_special_points', [...existingSps, ...addedSps]);
+        model.set('bifurcation_metadata', {
+          model_identity: modelIdentity,
+          active_params: activeParams,
+          fixed_params_identity: _bifurcationFixedParamsIdentity(model, activeParams),
+          stale: false,
+          status: 'complete',
+          error: null,
+          seed: seed.u,
+          ...(nonSmoothTokens.length > 0 ? { non_smooth_tokens: nonSmoothTokens } : {}),
+        });
+        bifurcationJob = null;
+        model.set('bifurcation_running', false);
+        emit(); sync();
+        return { branch, specialPoints: addedSps };
+      } catch (error) {
+        return _failBifurcationJob(job, error?.message || String(error));
+      }
+    },
+    async switchToLimitCycle(specialPointId, config = {}, owner = null) {
+      const entry = controller.restartCache.get(specialPointId);
+      const modelIdentity = _bifurcationModelIdentity(model);
+      const job = _beginBifurcationJob(owner, modelIdentity);
+      try {
+        if (!entry || entry.ty !== 'HB') {
+          return _failBifurcationJob(job, `Limit-cycle switching requires a Hopf (HB) point (got ${entry?.ty || 'none'})`);
+        }
+        const modelName = model.get('model_name');
+        const modelSpec = model.get('model_spec');
+        const def = resolveModel(modelName, modelSpec);
+        const params = { ...(def.defaultParams || {}), ...(model.get('params') || {}) };
+        const cfg = { ...(model.get('bifurcation_config') || {}), ...config };
+        const param1 = entry.param1 || cfg.param1 || Object.keys(def.defaultParams || {})[0];
+        const [rl0, rl1] = _resolveBifurcationRange(def, model, param1, cfg.range, cfg.rl0, cfg.rl1, params[param1]);
+
+        const client = _getAutoClient();
+        const res = await client.run({
+          model: { model_name: modelName, model_spec: modelSpec, params },
+          continuation: {
+            ips: 2,
+            isw: 1,
+            irs: entry.lab,
+            restartSp: entry.restartSp || entry,
+            activeParams: [param1],
+            rl0,
+            rl1,
+            ds: cfg.ds ?? 0.05,
+            dsmin: cfg.dsmin ?? 1e-4,
+            dsmax: cfg.dsmax ?? 0.2,
+            nmx: cfg.nmx ?? 200,
+            npr: cfg.npr ?? 200,
+            ntst: cfg.ntst ?? 50,
+            ncol: cfg.ncol ?? 4,
+            ilp: cfg.ilp ?? 1,
+            isp: cfg.isp ?? 2,
+          },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const existingBranches = model.get('bifurcation_branches') || [];
+        const existingSps = model.get('bifurcation_special_points') || [];
+        const branchId = _nextBranchId('lc', existingBranches);
+        const branch = {
+          id: branchId,
+          type: 'LC',
+          param1,
+          param2: null,
+          source_sp_id: specialPointId,
+          points: res.branch || [],
+        };
+        const addedSps = _registerSpecialPoints(res.specialPoints || [], branchId, param1, null, existingSps, controller.restartCache);
+
+        const prevMeta = model.get('bifurcation_metadata') || {};
+        const activeParams = [...new Set([...(prevMeta.active_params || []), param1])];
+        model.set('bifurcation_branches', [...existingBranches, branch]);
+        model.set('bifurcation_special_points', [...existingSps, ...addedSps]);
+        model.set('bifurcation_metadata', {
+          ...prevMeta,
+          model_identity: modelIdentity,
+          active_params: activeParams,
+          fixed_params_identity: _bifurcationFixedParamsIdentity(model, activeParams),
+          stale: false,
+          status: 'complete',
+          error: null,
+        });
+        bifurcationJob = null;
+        model.set('bifurcation_running', false);
+        emit(); sync();
+        return { branch, specialPoints: addedSps };
+      } catch (error) {
+        return _failBifurcationJob(job, error?.message || String(error));
+      }
+    },
+    async startTwoParamContinuation(specialPointId, param2, config = {}, owner = null) {
+      const entry = controller.restartCache.get(specialPointId);
+      const modelIdentity = _bifurcationModelIdentity(model);
+      const job = _beginBifurcationJob(owner, modelIdentity);
+      try {
+        if (!entry || (entry.ty !== 'LP' && entry.ty !== 'HB')) {
+          return _failBifurcationJob(job, `Two-parameter continuation requires an LP or HB point (got ${entry?.ty || 'none'})`);
+        }
+        const modelName = model.get('model_name');
+        const modelSpec = model.get('model_spec');
+        const def = resolveModel(modelName, modelSpec);
+        const params = { ...(def.defaultParams || {}), ...(model.get('params') || {}) };
+        const cfg = { ...(model.get('bifurcation_config') || {}), ...config };
+        const param1 = entry.param1 || cfg.param1 || Object.keys(def.defaultParams || {})[0];
+        if (!param2 || param2 === param1) {
+          return _failBifurcationJob(job, 'Choose a second parameter distinct from the primary parameter');
+        }
+        const [rl0, rl1] = _resolveBifurcationRange(def, model, param1, cfg.range, cfg.rl0, cfg.rl1, params[param1]);
+        const absDs = Math.abs(cfg.ds ?? 0.05) || 0.05;
+        const contBase = {
+          ips: 1,
+          isw: 2,
+          irs: entry.lab,
+          restartSp: entry.restartSp || entry,
+          activeParams: [param1, param2],
+          rl0,
+          rl1,
+          dsmin: cfg.dsmin ?? 1e-4,
+          dsmax: cfg.dsmax ?? 0.2,
+          nmx: cfg.nmx ?? 200,
+          npr: cfg.npr ?? 200,
+          ilp: cfg.ilp ?? 1,
+          isp: cfg.isp ?? 2,
+        };
+        const modelPayload = { model_name: modelName, model_spec: modelSpec, params };
+        const client = _getAutoClient();
+
+        const fwdRes = await client.run({
+          model: modelPayload,
+          continuation: { ...contBase, ds: absDs },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const bwdRes = await client.run({
+          model: modelPayload,
+          continuation: { ...contBase, ds: -absDs },
+        });
+        if (!_isBifurcationJobActive(job)) return null;
+
+        const existingBranches = model.get('bifurcation_branches') || [];
+        const existingSps = model.get('bifurcation_special_points') || [];
+        const branchType = entry.ty === 'LP' ? 'LP2' : 'HB2';
+        const branchId = _nextBranchId(branchType.toLowerCase(), existingBranches);
+        const stitchedPoints = _stitchBidirectionalBranch(bwdRes.branch, fwdRes.branch);
+        const branch = {
+          id: branchId,
+          type: branchType,
+          param1,
+          param2,
+          source_sp_id: specialPointId,
+          points: stitchedPoints,
+        };
+        const rawSps = [...(bwdRes.specialPoints || []), ...(fwdRes.specialPoints || [])];
+        const addedSps = _registerSpecialPoints(rawSps, branchId, param1, param2, existingSps, controller.restartCache);
+
+        const prevMeta = model.get('bifurcation_metadata') || {};
+        const activeParams = [...new Set([...(prevMeta.active_params || []), param1, param2])];
+        model.set('bifurcation_branches', [...existingBranches, branch]);
+        model.set('bifurcation_special_points', [...existingSps, ...addedSps]);
+        model.set('bifurcation_metadata', {
+          ...prevMeta,
+          model_identity: modelIdentity,
+          active_params: activeParams,
+          fixed_params_identity: _bifurcationFixedParamsIdentity(model, activeParams),
+          stale: false,
+          status: 'complete',
+          error: null,
+        });
+        bifurcationJob = null;
+        model.set('bifurcation_running', false);
+        emit(); sync();
+        return { branch, specialPoints: addedSps };
+      } catch (error) {
+        return _failBifurcationJob(job, error?.message || String(error));
+      }
+    },
+    async runBifurcationPreset(presetIndex, owner = null) {
+      const presets = model.get('bifurcation_presets') || [];
+      const preset = presets[presetIndex];
+      if (!preset) return null;
+
+      const prevCfg = model.get('bifurcation_config') || {};
+      model.set('bifurcation_config', {
+        ...prevCfg,
+        param1: preset.param1,
+        ...(preset.range ? { range: preset.range } : {}),
+        ...(preset.param2 ? { param2: preset.param2 } : {}),
+        ...(preset.range2 ? { range2: preset.range2 } : {}),
+      });
+      emit(); sync();
+
+      const epRes = await controller.startEquilibriumContinuation(
+        { param1: preset.param1, range: preset.range },
+        owner,
+      );
+      if (!epRes || disposed) return null;
+
+      let lcRes = null;
+      if (preset.auto_switch_lc) {
+        const hb = (epRes.specialPoints || []).find((sp) => sp.ty === 'HB');
+        if (hb) {
+          lcRes = await controller.switchToLimitCycle(
+            hb.id,
+            { param1: preset.param1, range: preset.range },
+            owner,
+          );
+          if (!lcRes || disposed) return { ep: epRes, lc: lcRes, twoParam: null };
+        }
+      }
+
+      let twoParamRes = null;
+      if (preset.auto_trace_2d && preset.param2) {
+        const sp2d = (epRes.specialPoints || []).find((sp) => sp.ty === 'LP' || sp.ty === 'HB');
+        if (sp2d) {
+          twoParamRes = await controller.startTwoParamContinuation(
+            sp2d.id,
+            preset.param2,
+            { range: preset.range, range2: preset.range2 },
+            owner,
+          );
+        }
+      }
+      return { ep: epRes, lc: lcRes, twoParam: twoParamRes };
+    },
+    jumpToBifurcationPoint(point, branch, opts = {}) {
+      if (!point) return;
+      const meta = model.get('bifurcation_metadata') || {};
+      const p1 = branch?.param1 || point.param1 || meta.active_params?.[0];
+      const p2 = branch?.param2 || point.param2 || null;
+      const nextParams = { ...(model.get('params') || {}) };
+      if (p1 && Number.isFinite(point.p)) nextParams[p1] = point.p;
+      if (p2 && Number.isFinite(point.p2)) nextParams[p2] = point.p2;
+
+      const updates = { params: nextParams };
+      const isEp = !branch || branch.type === 'EP';
+      const display = model.get('display') || [0, 1];
+      if (isEp && Array.isArray(point.u) && point.u.length > 2) {
+        const prevClamped = model.get('clamped') || [];
+        const nextClamped = point.u.map((val, i) => (
+          display.includes(i) ? (prevClamped[i] ?? val) : val
+        ));
+        updates.clamped = nextClamped;
+      }
+      if ((opts.updateInitialCondition || opts.setInitialCondition) && Array.isArray(point.u)) {
+        if (Number.isFinite(point.u[display[0]])) updates.x0 = point.u[display[0]];
+        if (display.length > 1 && Number.isFinite(point.u[display[1]])) updates.y0 = point.u[display[1]];
+      }
+      controller.commit(updates);
+    },
   };
   function sync() { if (!disposed) model.save_changes?.(); }
   function emit() { if (!disposed && !computing) for (const callback of [...subscribers]) callback(); }
@@ -189,6 +719,7 @@ function createExperimentController(model) {
   }
   for (const key of COMPUTATION_INPUTS) listen(key, schedule);
   for (const key of PRESENTATION_INPUTS) listen(key, emit);
+  for (const key of BIFURCATION_INPUTS) listen(key, emit);
   controller.refresh();
   return controller;
 }

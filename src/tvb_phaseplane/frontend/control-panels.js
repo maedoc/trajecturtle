@@ -161,11 +161,23 @@ function mountComparison({ model, controller, document: doc }) {
 }
 
 function mountExport({ model, controller, document: doc }) {
-  const scope = panelScope(), element = panelElement(doc, 'ppw-export-row', '<button class="ppw-export-svg">Export SVG</button><button class="ppw-export-tikz">Export TikZ</button>');
+  const scope = panelScope(), element = panelElement(doc, 'ppw-export-row', '<button class="ppw-export-svg">Export SVG</button><button class="ppw-export-bif-svg">Export Bifurcation SVG</button><button class="ppw-export-tikz">Export TikZ</button>');
   scope.on(element.querySelector('.ppw-export-svg'), 'click', () => {
     if (controller.error) return;
     const canvas = new C2S(500, 500); drawPhasePlane(model, canvas, 500, 500, plotTheme(element));
     downloadBlob(doc, new Blob([canvas.getSerializedSvg(true)], { type: 'image/svg+xml' }), 'phase_plane.svg');
+  });
+  const bifSvg = element.querySelector('.ppw-export-bif-svg');
+  scope.on(bifSvg, 'click', () => {
+    const branches = model.get('bifurcation_branches') || [];
+    if (controller.error || !branches.length) return;
+    const has1d = branches.some(b => b && (b.type === 'EP' || b.type === 'LC'));
+    const has2d = branches.some(b => b && (b.type === 'LP2' || b.type === 'HB2'));
+    const use2d = (model.get('bifurcation_config')?.viewMode === '2d' && has2d) || (!has1d && has2d);
+    const canvas = new C2S(560, 420);
+    if (use2d) drawBifurcation2D(model, canvas, 560, 420, plotTheme(element));
+    else drawBifurcation1D(model, canvas, 560, 420, plotTheme(element));
+    downloadBlob(doc, new Blob([canvas.getSerializedSvg(true)], { type: 'image/svg+xml' }), 'bifurcation.svg');
   });
   const tikz = element.querySelector('.ppw-export-tikz');
   const standalone = model._isMock || typeof model.send !== 'function';
@@ -173,5 +185,8 @@ function mountExport({ model, controller, document: doc }) {
   scope.on(tikz, 'click', () => model.send({ type: 'export_tikz' }));
   const receive = message => { if (message?.type === 'tikz_data') downloadBlob(doc, new Blob([message.content], { type: 'application/x-tex' }), message.filename || 'phase_plane.tex'); };
   if (!standalone) { model.on('msg:custom', receive); scope.cleanup(() => model.off('msg:custom', receive)); }
-  return mountedPanel(element, scope, () => { element.querySelector('.ppw-export-svg').disabled = !!controller.error; });
+  return mountedPanel(element, scope, () => {
+    element.querySelector('.ppw-export-svg').disabled = !!controller.error;
+    bifSvg.disabled = !!controller.error || !(model.get('bifurcation_branches') || []).length;
+  });
 }

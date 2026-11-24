@@ -10,6 +10,8 @@
       members:
         - __init__
         - to_standalone_html
+        - export_tikz
+        - export_bifurcation_tikz
         - run_sweep
 
 ## Model Base Class

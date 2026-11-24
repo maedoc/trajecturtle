@@ -8,19 +8,31 @@ import argparse
 
 ROOT = Path(__file__).resolve().parents[1] / "src/tvb_phaseplane"
 SOURCES = (
-    "vendor", "drawing-support", "engine", "coordinates", "experiment", "controller",
-    "components", "plot-drawing", "control-panels", "plot-panels", "editor-panel", "research-views", "navigator-view", "presentations", "view",
+    "vendor", "drawing-support", "models-core", "engine", "coordinates", "experiment", "auto-client", "controller",
+    "components", "plot-drawing", "control-panels", "plot-panels", "bifurcation-panel", "editor-panel", "research-views", "navigator-view", "presentations", "view",
+)
+WORKER_SOURCES = (
+    "worker-shim", "vendor", "models-core", "vendor-auto2000", "auto-worker",
+)
+TARGETS = (
+    ("static/widget.js", SOURCES),
+    ("static/auto2000-worker.js", WORKER_SOURCES),
 )
 
 
+def _assemble(sources):
+    return "\n".join((ROOT / "frontend" / f"{name}.js").read_text().rstrip() for name in sources) + "\n"
+
+
 def build(check=False):
-    content = "\n".join((ROOT / "frontend" / f"{name}.js").read_text().rstrip() for name in SOURCES) + "\n"
-    target = ROOT / "static/widget.js"
-    if check:
-        if target.read_text() != content:
-            raise SystemExit("Frontend bundle is stale; run python scripts/build_frontend.py")
-    else:
-        target.write_text(content)
+    for rel_target, sources in TARGETS:
+        content = _assemble(sources)
+        target = ROOT / rel_target
+        if check:
+            if not target.exists() or target.read_text() != content:
+                raise SystemExit(f"Frontend bundle {rel_target} is stale; run python scripts/build_frontend.py")
+        else:
+            target.write_text(content)
 
 
 if __name__ == "__main__":

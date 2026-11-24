@@ -6,6 +6,7 @@ Two usage modes:
      GitHub Pages, or any static site (no kernel, no Python runtime).
 """
 
+import base64
 import json
 import os
 import pathlib
@@ -94,12 +95,22 @@ class PhasePlaneWidget(anywidget.AnyWidget):
     panels = traitlets.List(traitlets.Unicode(), default_value=[]).tag(sync=True)
     visible_parameters = traitlets.List(traitlets.Unicode(), allow_none=True, default_value=None).tag(sync=True)
     panel_layout = traitlets.Enum(["horizontal", "vertical"], default_value="horizontal").tag(sync=True)
-    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson", "multiples", "navigator", "basin", "evidence", "prediction", "ensemble"], default_value="panels").tag(sync=True)
+    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson", "multiples", "navigator", "basin", "evidence", "prediction", "ensemble", "bifurcation"], default_value="panels").tag(sync=True)
     view_switcher = traitlets.Bool(False).tag(sync=True)
     sweep_param = traitlets.Unicode("").tag(sync=True)
     experiment_id = traitlets.Unicode("").tag(sync=True)
 
-    PANEL_NAMES = frozenset({"model", "parameters", "projection", "limits", "noise", "layers", "editor", "export", "comparison", "phase_plane", "time_series", "sweep"})
+    # Bifurcation / AUTO2000 continuation state
+    bifurcation_branches = traitlets.List(traitlets.Dict(), default_value=[]).tag(sync=True)
+    bifurcation_special_points = traitlets.List(traitlets.Dict(), default_value=[]).tag(sync=True)
+    bifurcation_config = traitlets.Dict(default_value={}).tag(sync=True)
+    bifurcation_running = traitlets.Bool(False).tag(sync=True)
+    bifurcation_metadata = traitlets.Dict(default_value={}).tag(sync=True)
+    bifurcation_presets = traitlets.List(traitlets.Dict(), default_value=[]).tag(sync=True)
+    auto_wasm_url = traitlets.Unicode("").tag(sync=True)
+    auto_worker_url = traitlets.Unicode("").tag(sync=True)
+
+    PANEL_NAMES = frozenset({"model", "parameters", "projection", "limits", "noise", "layers", "editor", "export", "comparison", "phase_plane", "time_series", "sweep", "bifurcation"})
 
     @traitlets.validate("panels")
     def _validate_panels(self, proposal):
@@ -260,6 +271,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
         *,
         on_render_js: str = "",
         views: list[dict] | None = None,
+        include_auto: bool = False,
     ):
         """Export the widget to a self-contained HTML file.
 
@@ -328,7 +340,22 @@ class PhasePlaneWidget(anywidget.AnyWidget):
             "panel_layout": self.panel_layout,
             "presentation": self.presentation,
             "view_switcher": self.view_switcher,
+            "bifurcation_branches": self.bifurcation_branches,
+            "bifurcation_special_points": self.bifurcation_special_points,
+            "bifurcation_config": self.bifurcation_config,
+            "bifurcation_running": False,
+            "bifurcation_metadata": self.bifurcation_metadata,
+            "bifurcation_presets": self.bifurcation_presets,
+            "auto_wasm_url": self.auto_wasm_url,
+            "auto_worker_url": self.auto_worker_url,
         }
+
+        auto_assets_js = ""
+        if include_auto:
+            wasm_b64 = base64.b64encode((_STATIC_DIR / "auto2000_core.wasm").read_bytes()).decode("ascii")
+            worker_src = (_STATIC_DIR / "auto2000-worker.js").read_text(encoding="utf-8")
+            payload = json.dumps({"wasmBase64": wasm_b64, "workerSource": worker_src}).replace("<", "\\u003c")
+            auto_assets_js = f"globalThis.__PPW_AUTO_ASSETS__ = {payload};\n"
 
         extra_js = f"\n{on_render_js}\n" if on_render_js else ""
         if views is not None:
@@ -354,7 +381,7 @@ class PhasePlaneWidget(anywidget.AnyWidget):
 <body>
 <div id="ppw-root"></div>
 <script type="module">
-{js_code}
+{auto_assets_js}{js_code}
 
 const initialState = {json.dumps(state, indent=2)};
 
@@ -589,6 +616,157 @@ if (viewConfigs === null) {{
         filename.write_text(tex, encoding="utf-8")
         return str(filename)
 
+    def _resolve_bifurcation_obs(self):
+        cfg = self.bifurcation_config or {}
+        raw = cfg.get("observable")
+        if raw in ("L2", "l2"):
+            return "L2", "L2 norm"
+        names = list(self.state_names or [])
+        if isinstance(raw, str) and raw in names:
+            idx = names.index(raw)
+            return idx, names[idx]
+        try:
+            idx = int(raw) if raw not in (None, "") else 0
+        except (TypeError, ValueError):
+            idx = 0
+        idx = max(0, min(max(0, len(names) - 1), idx))
+        return idx, (names[idx] if idx < len(names) else f"u{idx}")
+
+    @staticmethod
+    def _bif_obs_value(pt, obs_key, field="u"):
+        if obs_key == "L2":
+            val = pt.get("L2")
+            return float(val) if val is not None else None
+        arr = pt.get(field)
+        if isinstance(arr, (list, tuple)) and obs_key < len(arr):
+            return float(arr[obs_key])
+        if field == "u" and pt.get("u") is not None and not isinstance(pt.get("u"), (list, tuple)):
+            return float(pt["u"])
+        return None
+
+    @staticmethod
+    def _split_stable_segments(points):
+        segments = []
+        cur_stable = None
+        cur_pts = []
+        for pt in points or []:
+            st = bool(pt.get("stable"))
+            if cur_pts and st != cur_stable:
+                segments.append((cur_stable, cur_pts + [pt]))
+                cur_pts = [pt]
+            else:
+                cur_pts.append(pt)
+            cur_stable = st
+        if cur_pts:
+            segments.append((cur_stable, cur_pts))
+        return segments
+
+    def export_bifurcation_tikz(self, filename: str | pathlib.Path | None = None):
+        """Generate a self-contained PGFPlots ``.tex`` file for the bifurcation diagram.
+
+        Parameters
+        ----------
+        filename : str or pathlib.Path, optional
+            If provided, writes the ``.tex`` file to ``filename`` and returns
+            its path as a string. If ``None``, returns the LaTeX source string.
+        """
+        cfg = self.bifurcation_config or {}
+        all_branches = self.bifurcation_branches or []
+        all_sps = self.bifurcation_special_points or []
+        branches_1d = [b for b in all_branches if b and b.get("type") in ("EP", "LC")]
+        branches_2d = [b for b in all_branches if b and b.get("type") in ("LP2", "HB2")]
+        is_2d = (cfg.get("viewMode") == "2d" and branches_2d) or (not branches_1d and bool(branches_2d))
+
+        obs_key, obs_label = self._resolve_bifurcation_obs()
+        param_names = list((self.params or {}).keys())
+        meta = self.bifurcation_metadata or {}
+        plots = []
+        sp_nodes = []
+
+        if is_2d:
+            param1 = branches_2d[0].get("param1") or cfg.get("param1") or (param_names[0] if param_names else "p1")
+            param2 = branches_2d[0].get("param2") or cfg.get("param2") or next((k for k in param_names if k != param1), "p2")
+            xlabel, ylabel = param1.replace("_", r"\_"), param2.replace("_", r"\_")
+            for br in branches_2d:
+                coords = [[float(pt["p"]), float(pt["p2"])] for pt in br.get("points") or [] if "p" in pt and "p2" in pt]
+                if len(coords) >= 2:
+                    color = "red!75!black" if br.get("type") == "HB2" else "blue!75!black"
+                    plots.append(f"            \\addplot[{color}, thick, no marks] {self._fmt_coords(coords)};")
+            b_ids = {br.get("id") for br in branches_2d}
+            for sp in all_sps:
+                if not sp or (sp.get("branch_id") not in b_ids and "p2" not in sp):
+                    continue
+                if "p" in sp and "p2" in sp:
+                    lbl = str(sp.get("label") or sp.get("id") or sp.get("ty") or "").replace("_", r"\_")
+                    sp_nodes.append(
+                        f"\\node[circle, fill=black, inner sep=1.5pt, label={{[font=\\tiny]above right:{lbl}}}] "
+                        f"at (axis cs:{float(sp['p']):.6f},{float(sp['p2']):.6f}) {{}};"
+                    )
+        else:
+            param1 = cfg.get("param1") or (branches_1d[0].get("param1") if branches_1d else None) or (meta.get("active_params") or [None])[0] or (param_names[0] if param_names else "p")
+            xlabel, ylabel = param1.replace("_", r"\_"), obs_label.replace("_", r"\_")
+            for br in branches_1d:
+                btype = br.get("type")
+                for stable, seg in self._split_stable_segments(br.get("points")):
+                    if btype == "EP":
+                        coords = [
+                            [float(pt["p"]), val]
+                            for pt in seg
+                            if "p" in pt and (val := self._bif_obs_value(pt, obs_key, "u")) is not None
+                        ]
+                        if len(coords) >= 2:
+                            style = "blue!75!black, thick, no marks" if stable else "gray, thick, dashed, no marks"
+                            plots.append(f"            \\addplot[{style}] {self._fmt_coords(coords)};")
+                    elif btype == "LC":
+                        style = "green!60!black, very thick, no marks" if stable else "orange!85!black, thick, dashed, no marks"
+                        for field in ("u_max", "u_min"):
+                            coords = [
+                                [float(pt["p"]), val]
+                                for pt in seg
+                                if "p" in pt and (val := self._bif_obs_value(pt, obs_key, field)) is not None
+                            ]
+                            if len(coords) >= 2:
+                                plots.append(f"            \\addplot[{style}] {self._fmt_coords(coords)};")
+            for sp in all_sps:
+                if not sp or sp.get("ty") in ("CP", "BT", "GH") or sp.get("param2"):
+                    continue
+                val = self._bif_obs_value(sp, obs_key, "u")
+                if "p" in sp and val is not None:
+                    lbl = str(sp.get("label") or sp.get("id") or sp.get("ty") or "").replace("_", r"\_")
+                    sp_nodes.append(
+                        f"\\node[circle, draw=black, fill=white, inner sep=1.5pt, label={{[font=\\tiny]above right:{lbl}}}] "
+                        f"at (axis cs:{float(sp['p']):.6f},{val:.6f}) {{}};"
+                    )
+
+        escaped_model = self.model_name.replace("_", r"\_")
+        plots_block = "\n".join(plots)
+        sp_block = "\n            ".join(sp_nodes)
+        tex = (
+            r"\documentclass[border=5pt]{standalone}" + "\n"
+            r"\usepackage{pgfplots}" + "\n"
+            r"\usepackage{tikz}" + "\n"
+            r"\pgfplotsset{compat=1.17}" + "\n"
+            r"\begin{document}" + "\n"
+            r"\begin{tikzpicture}" + "\n"
+            r"\begin{axis}[" + "\n"
+            "    width=12cm, height=8cm,\n"
+            f"    xlabel=${xlabel}$, ylabel=${ylabel}$,\n"
+            f"    title={{{escaped_model} bifurcation diagram}},\n"
+            "    grid=major,\n"
+            "    enlargelimits=true,\n"
+            "]\n"
+            + (plots_block + "\n" if plots_block else "")
+            + ("            " + sp_block + "\n" if sp_block else "")
+            + r"\end{axis}" + "\n"
+            r"\end{tikzpicture}" + "\n"
+            r"\end{document}" + "\n"
+        )
+        if filename is None:
+            return tex
+        out = pathlib.Path(filename)
+        out.write_text(tex, encoding="utf-8")
+        return str(out)
+
     # ── Custom message handler (JS → Python) ──
 
     def _on_custom_msg(self, _widget, content, buffers):
@@ -609,6 +787,10 @@ if (viewConfigs === null) {{
                 )
             finally:
                 os.unlink(tmppath)
+        elif msg_type == "request_auto_assets":
+            wasm_bytes = (_STATIC_DIR / "auto2000_core.wasm").read_bytes()
+            worker_bytes = (_STATIC_DIR / "auto2000-worker.js").read_bytes()
+            self.send({"type": "auto_assets"}, buffers=[wasm_bytes, worker_bytes])
 
 
 class ExperimentView(anywidget.AnyWidget):
@@ -618,7 +800,7 @@ class ExperimentView(anywidget.AnyWidget):
     _css = PhasePlaneWidget._css
     experiment = traitlets.Instance(PhasePlaneWidget).tag(sync=True, **ipywidgets.widget_serialization)
     view_switcher = traitlets.Bool(False).tag(sync=True)
-    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson", "multiples", "navigator", "basin", "evidence", "prediction", "ensemble"], default_value="panels").tag(sync=True)
+    presentation = traitlets.Enum(["panels", "figure", "bench", "drawer", "comparison", "lesson", "multiples", "navigator", "basin", "evidence", "prediction", "ensemble", "bifurcation"], default_value="panels").tag(sync=True)
     panels = traitlets.List(traitlets.Unicode()).tag(sync=True)
     visible_parameters = traitlets.List(traitlets.Unicode(), allow_none=True, default_value=None).tag(sync=True)
     panel_layout = traitlets.Enum(["horizontal", "vertical"], default_value="horizontal").tag(sync=True)
